@@ -161,3 +161,8 @@ On its first Browserless run, a migrated test failed with `CancellableLLMProvide
 
 `@PageTitle` is ordinary Flow behaviour (the browser tab title), and it is available on every tool: `document.title` in a browser, `UI.getInternals().getTitle()` on Browserless. But `PageAssert` has only `isAt`, `hasPath` and `hasQueryParameter`, so a title check stays Playwright-only behind the Escape Hatch.
 **Suggestion:** `assertThat(page).hasTitle(..)`.
+
+### F22: No retrying assertion for grid column headers. Verified
+
+`UnifiedGrid.getColumnHeaders()` exists, but `GridAssert` has only `hasRowCount` / `isEmpty`, and `GridColumnAssert` has only sort and cell checks. "The leaderboard now has a *Cooked times* column", the main outcome of an AI grid reshape in Mise, therefore needs `page.waitUntil(() -> grid.getColumnHeaders().contains("Cooked times"))`. That shows as a gap in the reports, and its failure message is weaker.
+**Suggestion:** `assertThat(grid).hasColumn("Cooked times")` / `hasColumnHeaders(..)`, or `assertThat(grid.column("Cooked times")).exists()`.

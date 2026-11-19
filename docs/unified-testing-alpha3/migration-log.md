@@ -335,3 +335,13 @@ How the executions are set up:
 - `playwright.navigate(baseUrl() + "/plan?week=…")` → `page.navigate("/plan?week=…")`. The query string works on Browserless too, and the `@LocalServerPort` helper added in step 5 is gone.
 - The repository-only test lost its `UnifiedPage` parameter and its pointless `navigate`.
 - **Result:** Playwright 5/5, Browserless 5/5.
+
+### 7d: ReportsViewIT
+
+- 26 of 27 markers resolved:
+  - Widgets use `find(UnifiedContainer.class).withTestId(..)`, the leaderboard uses `find(UnifiedGrid.class).withTestId("leaderboard-grid")`, and the reset buttons use `find(UnifiedButton.class).withTestId(..)` with `exists()`.
+  - The "≥1 row" check, which counted `vaadin-grid-cell-content` in the DOM, became `assertThat(grid.row(0)).exists()`.
+  - The `getByText("Cooked times")` header checks became `page.waitUntil(() -> grid.getColumnHeaders().contains(..))`, because there is no column-header assertion (F22).
+  - The `navigate(baseUrl()+"/reports")` reloads became `page.reload()`, which also says what the test means.
+- Kept: the page-title Escape Hatch (F21).
+- **Result:** Playwright 11/11, Browserless 10/10 (title test skipped). The charts and the grid all run on Browserless as server-side components.
