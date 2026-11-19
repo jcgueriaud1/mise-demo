@@ -400,3 +400,28 @@ How the executions are set up:
   - Browserless, which can't see CSS, happily typed into it and passed (F24).
   - They stay `@RequiresTestingTool(PLAYWRIGHT)` and set the value through the web component's property, as before.
 - **Result:** Playwright 13/13, Browserless 11/11 (2 skipped).
+
+### 7i: PlanViewBrowserlessTest
+
+- The 2 markers from step 4 are resolved. `$(Button.class).id("mise-meal-undo-friday")` + `test(undoBtn).click()` became `page.find(UnifiedButton.class).withAccessibleName("Undo Friday").click()`. The `BrowserlessEscapeHatch` and `@RequiresTestingTool(BROWSERLESS)` are gone.
+- **Result:** passes on Browserless (the surefire default) and on Playwright (`./mvnw test -Dtest=PlanViewBrowserlessTest -Dvaadin.testing.tool=playwright`). The former "Browserless example" now runs everywhere.
+
+### Step 7 summary
+
+| Class | Markers before | Resolved | Kept (with reason) | Open | Playwright | Browserless |
+|---|---|---|---|---|---|---|
+| OnboardingViewIT | 18 | 18 | 0 | 0 | 4/4 | 4/4 |
+| OnboardingRedirectIT | 1 | 1 | 0 | 0 | 1/1 | 1/1 |
+| HomeViewIT | 3 | 2 | 1 (page title) | 0 | 3/3 | 2/2 + 1 skipped |
+| GenerateFutureWeeksIT | 12 | 12 | 0 | 0 | 5/5 | 5/5 |
+| ReportsViewIT | 27 | 26 | 1 (page title) | 0 | 11/11 | 10/10 + 1 skipped |
+| ChatDockIT | 28 | — | 2 tests (CSS, scroll) | 0 | 3/3 | 1/1 + 2 skipped |
+| ChatBusyStopIT | 27 | 27 | 0 | 0 | 3/3 | 3/3 |
+| PlanViewIT | 59 | 58 | 1 (page title) | 0 | 19/19 | 18/18 + 1 skipped |
+| ShoppingViewIT | 44 | 43 | 1 (page title) | 0 | 12/12 | 11/11 + 1 skipped |
+| WeekNavigationIT | 57 | — | 2 tests (CSS-hidden picker) | 0 | 13/13 | 11/11 + 2 skipped |
+| PlanViewBrowserlessTest | 2 | 2 | 0 | 0 | 1/1 | 1/1 |
+| ManualExamplesReportsIT | 2 | 0 | 0 | **2** | not run (live LLM) | — |
+| ManualExamplesStopIT | 7 | 0 | 0 | **7** | not run (live LLM) | — |
+
+**Open item:** the two `@Tag("manual-example")` release-gate ITs need a live LLM endpoint and run only with `-Pmanual-verify`. They still compile and work as Playwright Escape Hatches with their 9 markers. They weren't converted blind, because their 300 s model-turn waits need a deliberate Unified timeout choice that can only be checked against a real model.
