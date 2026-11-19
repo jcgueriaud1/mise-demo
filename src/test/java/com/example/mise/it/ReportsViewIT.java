@@ -1,5 +1,16 @@
 package com.example.mise.it;
 
+import org.springframework.boot.test.web.server.LocalServerPort;
+import com.example.mise.it.support.TestChatModel;
+import com.vaadin.testing.unified.RequiresTestingTool;
+import com.vaadin.testing.unified.TestingTool;
+import com.vaadin.testing.unified.UnifiedPage;
+import com.vaadin.testing.unified.spring.UnifiedSpringBootTest;
+import com.example.mise.it.support.TestAiConfig;
+
+import com.microsoft.playwright.Page;
+import org.springframework.context.annotation.Import;
+import org.springframework.test.context.ActiveProfiles;
 import com.example.mise.ai.tools.ReportingTools;
 import com.example.mise.domain.preferences.ViewPreferenceService;
 import com.example.mise.capabilities.recipes.RecipeCatalog;
@@ -41,7 +52,25 @@ import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertTha
  * <p>Cleanup in {@code @AfterEach} deletes rows in FK-safe order:
  * meal_edit → view_preference → conversation_message → meal → plan → household.
  */
-class ReportsViewIT extends MisePlaywrightIT {
+@ActiveProfiles("it")
+@Import(TestAiConfig.class)
+@UnifiedSpringBootTest
+class ReportsViewIT {
+
+    @LocalServerPort
+    int port;
+
+    private String baseUrl() {
+        return "http://localhost:" + port;
+    }
+
+    @Autowired
+    TestChatModel chatModel;
+
+    @BeforeEach
+    void resetChatModelBetweenTests() {
+        chatModel.reset();
+    }
 
     @Autowired
     private HouseholdService householdService;
@@ -76,18 +105,12 @@ class ReportsViewIT extends MisePlaywrightIT {
     @Autowired
     private ViewPreferenceService viewPreferenceService;
 
-    @Override
-    public String getView() {
-        return "/reports";
-    }
-
     /**
      * Override: seed Household + 4 HISTORICAL plans + 1 ACTIVE plan BEFORE the base class
      * navigates to /reports. Seeding history satisfies AC #1 ("≥4 weeks of data").
      */
-    @Override
     @BeforeEach
-    public void setupTest() throws Exception {
+    void seedBeforeNavigation() throws Exception {
         Household h = new Household();
         h.setName("IT Reports Household");
         h.setSize(2);
@@ -103,9 +126,6 @@ class ReportsViewIT extends MisePlaywrightIT {
 
         // Seed the current week's ACTIVE plan
         planService.generateActivePlan(household, recipeCatalog);
-
-        // Navigate AFTER seeding so ReportsView.beforeEnter() finds the household and plans
-        super.setupTest();
     }
 
     @AfterEach
@@ -130,16 +150,24 @@ class ReportsViewIT extends MisePlaywrightIT {
      * AC #1: /reports loads with the correct page title.
      */
     @Test
-    void hasPageTitle() {
-        assertThat(page).hasTitle("Mise — Reports");
+    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    void hasPageTitle(UnifiedPage page) {
+        Page playwright = page.unwrap(Page.class);
+        page.navigate("/reports");
+        // TODO unified: Dramafinder Escape Hatch: assertThat(playwright).hasTitle("Mise — Reports")
+        assertThat(playwright).hasTitle("Mise — Reports");
     }
 
     /**
      * AC #1: the root reports container is visible.
      */
     @Test
-    void reportsViewContainerIsVisible() {
-        assertThat(page.getByTestId("reports-view")).isVisible();
+    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    void reportsViewContainerIsVisible(UnifiedPage page) {
+        Page playwright = page.unwrap(Page.class);
+        page.navigate("/reports");
+        // TODO unified: Dramafinder Escape Hatch: assertThat(playwright.getByTestId("reports-view")).isVisible()
+        assertThat(playwright.getByTestId("reports-view")).isVisible();
     }
 
     // ── AC #1: all three widgets render ───────────────────────────────────────
@@ -148,24 +176,36 @@ class ReportsViewIT extends MisePlaywrightIT {
      * AC #1: the weekly cost-trend chart container is visible.
      */
     @Test
-    void costTrendWidgetIsVisible() {
-        assertThat(page.getByTestId("report-cost-trend")).isVisible();
+    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    void costTrendWidgetIsVisible(UnifiedPage page) {
+        Page playwright = page.unwrap(Page.class);
+        page.navigate("/reports");
+        // TODO unified: Dramafinder Escape Hatch: assertThat(playwright.getByTestId("report-cost-trend")).isVisible()
+        assertThat(playwright.getByTestId("report-cost-trend")).isVisible();
     }
 
     /**
      * AC #1: the cost-by-category chart container is visible.
      */
     @Test
-    void categoryBreakdownWidgetIsVisible() {
-        assertThat(page.getByTestId("report-category-breakdown")).isVisible();
+    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    void categoryBreakdownWidgetIsVisible(UnifiedPage page) {
+        Page playwright = page.unwrap(Page.class);
+        page.navigate("/reports");
+        // TODO unified: Dramafinder Escape Hatch: assertThat(playwright.getByTestId("report-category-breakdown")).isVisible()
+        assertThat(playwright.getByTestId("report-category-breakdown")).isVisible();
     }
 
     /**
      * AC #1: the per-meal leaderboard grid is visible.
      */
     @Test
-    void leaderboardWidgetIsVisible() {
-        assertThat(page.getByTestId("leaderboard-grid")).isVisible();
+    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    void leaderboardWidgetIsVisible(UnifiedPage page) {
+        Page playwright = page.unwrap(Page.class);
+        page.navigate("/reports");
+        // TODO unified: Dramafinder Escape Hatch: assertThat(playwright.getByTestId("leaderboard-grid")).isVisible()
+        assertThat(playwright.getByTestId("leaderboard-grid")).isVisible();
     }
 
     /**
@@ -173,10 +213,16 @@ class ReportsViewIT extends MisePlaywrightIT {
      * This mirrors the "allThreeWidgetsRender" specification item.
      */
     @Test
-    void allThreeWidgetsRender() {
-        assertThat(page.getByTestId("report-cost-trend")).isVisible();
-        assertThat(page.getByTestId("report-category-breakdown")).isVisible();
-        assertThat(page.getByTestId("leaderboard-grid")).isVisible();
+    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    void allThreeWidgetsRender(UnifiedPage page) {
+        Page playwright = page.unwrap(Page.class);
+        page.navigate("/reports");
+        // TODO unified: Dramafinder Escape Hatch: assertThat(playwright.getByTestId("report-cost-trend")).isVisible()
+        assertThat(playwright.getByTestId("report-cost-trend")).isVisible();
+        // TODO unified: Dramafinder Escape Hatch: assertThat(playwright.getByTestId("report-category-breakdown")).isVisible()
+        assertThat(playwright.getByTestId("report-category-breakdown")).isVisible();
+        // TODO unified: Dramafinder Escape Hatch: assertThat(playwright.getByTestId("leaderboard-grid")).isVisible()
+        assertThat(playwright.getByTestId("leaderboard-grid")).isVisible();
     }
 
     // ── AC #1: leaderboard has rows ───────────────────────────────────────────
@@ -190,10 +236,16 @@ class ReportsViewIT extends MisePlaywrightIT {
      * is ≥ 1 scoped to the leaderboard container.
      */
     @Test
-    void leaderboardGridHasRows() {
-        var leaderboardGrid = page.getByTestId("leaderboard-grid");
+    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    void leaderboardGridHasRows(UnifiedPage page) {
+        Page playwright = page.unwrap(Page.class);
+        page.navigate("/reports");
+        // TODO unified: Dramafinder Escape Hatch: playwright.getByTestId("leaderboard-grid")
+        var leaderboardGrid = playwright.getByTestId("leaderboard-grid");
+        // TODO unified: Dramafinder Escape Hatch: assertThat(leaderboardGrid).isVisible()
         assertThat(leaderboardGrid).isVisible();
         // Vaadin Grid renders row cells as vaadin-grid-cell-content inside the grid element
+        // TODO unified: Dramafinder Escape Hatch: leaderboardGrid.locator("vaadin-grid-cell-content").count()
         int cellCount = leaderboardGrid.locator("vaadin-grid-cell-content").count();
         Assertions.assertThat(cellCount)
                 .as("Leaderboard must have at least 1 rendered cell (AC #1: ≥1 row)")
@@ -207,19 +259,26 @@ class ReportsViewIT extends MisePlaywrightIT {
      * must be restored into the Grid on load — the custom column header appears.
      */
     @Test
-    void persistedLeaderboardQueryRestoresOnLoad() {
+    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    void persistedLeaderboardQueryRestoresOnLoad(UnifiedPage page) {
+        Page playwright = page.unwrap(Page.class);
+        page.navigate("/reports");
         var household = householdService.findHousehold().orElseThrow();
         viewPreferenceService.saveSettings(household.getId(), ViewPreference.View.REPORTS,
                 "leaderboard", java.util.Map.of("query",
                         "SELECT recipe_name AS \"Meal\", COUNT(*) AS \"Cooked times\" "
                         + "FROM meal_history GROUP BY recipe_name ORDER BY COUNT(*) DESC"));
 
-        page.navigate(getUrl() + "/reports");
-        assertThat(page.getByTestId("leaderboard-grid").getByText("Cooked times")).isVisible();
+        // TODO unified: Dramafinder Escape Hatch: playwright.navigate(baseUrl() + "/reports")
+        playwright.navigate(baseUrl() + "/reports");
+        // TODO unified: Dramafinder Escape Hatch: assertThat(playwright.getByTestId("leaderboard-grid").getByText("Cooked times")).isVisible()
+        assertThat(playwright.getByTestId("leaderboard-grid").getByText("Cooked times")).isVisible();
 
         // Second reload — the customization survives (persistence, not session state)
-        page.navigate(getUrl() + "/reports");
-        assertThat(page.getByTestId("leaderboard-grid").getByText("Cooked times")).isVisible();
+        // TODO unified: Dramafinder Escape Hatch: // Second reload — the customization survives (persistence, not session state)playwright.navigate(baseUrl() + "/reports")
+        playwright.navigate(baseUrl() + "/reports");
+        // TODO unified: Dramafinder Escape Hatch: assertThat(playwright.getByTestId("leaderboard-grid").getByText("Cooked times")).isVisible()
+        assertThat(playwright.getByTestId("leaderboard-grid").getByText("Cooked times")).isVisible();
     }
 
     // ── UC-008 AC #2 / UC-012: derived kcal-per-euro leaderboard column ───────
@@ -237,7 +296,10 @@ class ReportsViewIT extends MisePlaywrightIT {
      * load, with the derived-column header rendered, and survives a reload.
      */
     @Test
-    void leaderboardKcalPerEuroColumnRestoresOnLoad() {
+    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    void leaderboardKcalPerEuroColumnRestoresOnLoad(UnifiedPage page) {
+        Page playwright = page.unwrap(Page.class);
+        page.navigate("/reports");
         var household = householdService.findHousehold().orElseThrow();
         viewPreferenceService.saveSettings(household.getId(), ViewPreference.View.REPORTS,
                 "leaderboard", java.util.Map.of("query",
@@ -246,12 +308,16 @@ class ReportsViewIT extends MisePlaywrightIT {
                         + "/ AVG(CAST(est_cost_eur AS DOUBLE)), 1) AS \"kcal per euro\" "
                         + "FROM meal_history GROUP BY recipe_name ORDER BY 3 DESC"));
 
-        page.navigate(getUrl() + "/reports");
-        assertThat(page.getByTestId("leaderboard-grid").getByText("kcal per euro")).isVisible();
+        // TODO unified: Dramafinder Escape Hatch: playwright.navigate(baseUrl() + "/reports")
+        playwright.navigate(baseUrl() + "/reports");
+        // TODO unified: Dramafinder Escape Hatch: assertThat(playwright.getByTestId("leaderboard-grid").getByText("kcal per euro")).isVisible()
+        assertThat(playwright.getByTestId("leaderboard-grid").getByText("kcal per euro")).isVisible();
 
         // Second reload — the derived column survives (persistence, not session state).
-        page.navigate(getUrl() + "/reports");
-        assertThat(page.getByTestId("leaderboard-grid").getByText("kcal per euro")).isVisible();
+        // TODO unified: Dramafinder Escape Hatch: // Second reload — the derived column survives (persistence, not session state).playwright.navigate(baseUrl() + "/reports")
+        playwright.navigate(baseUrl() + "/reports");
+        // TODO unified: Dramafinder Escape Hatch: assertThat(playwright.getByTestId("leaderboard-grid").getByText("kcal per euro")).isVisible()
+        assertThat(playwright.getByTestId("leaderboard-grid").getByText("kcal per euro")).isVisible();
     }
 
     // ── UC-012 BR-10: reset drops the persisted state ─────────────────────────
@@ -261,22 +327,30 @@ class ReportsViewIT extends MisePlaywrightIT {
      * ViewPreference row; after reload the widget is back on its default query.
      */
     @Test
-    void resetWidgetRevertsToDefaultQuery() {
+    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    void resetWidgetRevertsToDefaultQuery(UnifiedPage page) {
+        Page playwright = page.unwrap(Page.class);
+        page.navigate("/reports");
         var household = householdService.findHousehold().orElseThrow();
         viewPreferenceService.saveSettings(household.getId(), ViewPreference.View.REPORTS,
                 "leaderboard", java.util.Map.of("query",
                         "SELECT recipe_name AS \"Meal\", COUNT(*) AS \"Cooked times\" "
                         + "FROM meal_history GROUP BY recipe_name ORDER BY COUNT(*) DESC"));
 
-        page.navigate(getUrl() + "/reports");
-        assertThat(page.getByTestId("leaderboard-grid").getByText("Cooked times")).isVisible();
+        // TODO unified: Dramafinder Escape Hatch: playwright.navigate(baseUrl() + "/reports")
+        playwright.navigate(baseUrl() + "/reports");
+        // TODO unified: Dramafinder Escape Hatch: assertThat(playwright.getByTestId("leaderboard-grid").getByText("Cooked times")).isVisible()
+        assertThat(playwright.getByTestId("leaderboard-grid").getByText("Cooked times")).isVisible();
 
         reportingTools.resetReportsWidget("leaderboard");
 
-        page.navigate(getUrl() + "/reports");
-        assertThat(page.getByTestId("leaderboard-grid").getByText("Cooked times")).not().isVisible();
+        // TODO unified: Dramafinder Escape Hatch: playwright.navigate(baseUrl() + "/reports")
+        playwright.navigate(baseUrl() + "/reports");
+        // TODO unified: Dramafinder Escape Hatch: assertThat(playwright.getByTestId("leaderboard-grid").getByText("Cooked times")).not().isVisible()
+        assertThat(playwright.getByTestId("leaderboard-grid").getByText("Cooked times")).not().isVisible();
         // Default query header is back
-        assertThat(page.getByTestId("leaderboard-grid").getByText("Times")).isVisible();
+        // TODO unified: Dramafinder Escape Hatch: // Default query header is backassertThat(playwright.getByTestId("leaderboard-grid").getByText("Times")).isVisible()
+        assertThat(playwright.getByTestId("leaderboard-grid").getByText("Times")).isVisible();
     }
 
     // ── Reset buttons are rendered (UI surface) ───────────────────────────────
@@ -286,9 +360,15 @@ class ReportsViewIT extends MisePlaywrightIT {
      * see {@code widgetShell(...)} in ReportsView).
      */
     @Test
-    void resetButtonsArePresentForCustomisableWidgets() {
-        assertThat(page.getByTestId("report-reset-trendChart")).isAttached();
-        assertThat(page.getByTestId("report-reset-categoryChart")).isAttached();
-        assertThat(page.getByTestId("report-reset-leaderboard")).isAttached();
+    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    void resetButtonsArePresentForCustomisableWidgets(UnifiedPage page) {
+        Page playwright = page.unwrap(Page.class);
+        page.navigate("/reports");
+        // TODO unified: Dramafinder Escape Hatch: assertThat(playwright.getByTestId("report-reset-trendChart")).isAttached()
+        assertThat(playwright.getByTestId("report-reset-trendChart")).isAttached();
+        // TODO unified: Dramafinder Escape Hatch: assertThat(playwright.getByTestId("report-reset-categoryChart")).isAttached()
+        assertThat(playwright.getByTestId("report-reset-categoryChart")).isAttached();
+        // TODO unified: Dramafinder Escape Hatch: assertThat(playwright.getByTestId("report-reset-leaderboard")).isAttached()
+        assertThat(playwright.getByTestId("report-reset-leaderboard")).isAttached();
     }
 }

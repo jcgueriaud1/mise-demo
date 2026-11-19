@@ -1,5 +1,14 @@
 package com.example.mise.it;
 
+import org.junit.jupiter.api.BeforeEach;
+import com.example.mise.it.support.TestChatModel;
+import com.vaadin.testing.unified.RequiresTestingTool;
+import com.vaadin.testing.unified.TestingTool;
+import com.vaadin.testing.unified.UnifiedPage;
+import com.vaadin.testing.unified.spring.UnifiedSpringBootTest;
+import com.example.mise.it.support.TestAiConfig;
+import org.springframework.context.annotation.Import;
+import org.springframework.test.context.ActiveProfiles;
 import com.example.mise.domain.conversation.ConversationMessage;
 import com.example.mise.domain.conversation.ConversationMessageRepository;
 
@@ -9,6 +18,8 @@ import org.vaadin.addons.dramafinder.element.MessageInputElement;
 import org.vaadin.addons.dramafinder.element.MessageListElement;
 
 import org.assertj.core.api.Assertions;
+
+import com.microsoft.playwright.Page;
 
 import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
 
@@ -24,50 +35,79 @@ import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertTha
  * <p>BR-01 (existing household → redirect to /plan) is covered by the companion
  * {@link OnboardingRedirectIT} class, which seeds the household before navigation.
  */
-class OnboardingViewIT extends MisePlaywrightIT {
+@ActiveProfiles("it")
+@Import(TestAiConfig.class)
+@UnifiedSpringBootTest
+class OnboardingViewIT {
+
+    @Autowired
+    TestChatModel chatModel;
+
+    @BeforeEach
+    void resetChatModelBetweenTests() {
+        chatModel.reset();
+    }
 
     private static final String OPENING_GREETING_FRAGMENT = "Hi — I'll set up your dinners";
 
     @Autowired
     ConversationMessageRepository conversationMessageRepository;
 
-    @Override
-    public String getView() {
-        return "/welcome";
-    }
-
     @Test
-    void seededGreetingRendersOnFirstLoad() {
-        MessageListElement messages = MessageListElement.get(page);
+    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    void seededGreetingRendersOnFirstLoad(UnifiedPage page) {
+        Page playwright = page.unwrap(Page.class);
+        page.navigate("/welcome");
+        // TODO unified: Dramafinder Escape Hatch: MessageListElement.get(playwright)
+        MessageListElement messages = MessageListElement.get(playwright);
+        // TODO unified: Dramafinder Escape Hatch: messages.assertMessageCount(1)
         messages.assertMessageCount(1);
+        // TODO unified: Dramafinder Escape Hatch: assertThat(messages.getMessage(0)).containsText(OPENING_GREETING_FRAGMENT)
         assertThat(messages.getMessage(0)).containsText(OPENING_GREETING_FRAGMENT);
     }
 
     @Test
-    void userInputRoundTripsThroughStubbedAssistant() {
+    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    void userInputRoundTripsThroughStubbedAssistant(UnifiedPage page) {
+        Page playwright = page.unwrap(Page.class);
+        page.navigate("/welcome");
         chatModel.queueReply("Got it — two adults, no fish, €90/week. Sound right?");
 
-        MessageInputElement input = MessageInputElement.get(page);
-        MessageListElement messages = MessageListElement.get(page);
+        // TODO unified: Dramafinder Escape Hatch: MessageInputElement.get(playwright)
+        MessageInputElement input = MessageInputElement.get(playwright);
+        // TODO unified: Dramafinder Escape Hatch: MessageListElement.get(playwright)
+        MessageListElement messages = MessageListElement.get(playwright);
 
+        // TODO unified: Dramafinder Escape Hatch: input.typeAndSubmit("Two adults, no fish, around €90 a week")
         input.typeAndSubmit("Two adults, no fish, around €90 a week");
 
         // Greeting + user + assistant
+        // TODO unified: Dramafinder Escape Hatch: // Greeting + user + assistantmessages.assertMessageCount(3)
         messages.assertMessageCount(3);
+        // TODO unified: Dramafinder Escape Hatch: assertThat(messages.getMessage(1)).containsText("Two adults, no fish")
         assertThat(messages.getMessage(1)).containsText("Two adults, no fish");
+        // TODO unified: Dramafinder Escape Hatch: assertThat(messages.getMessage(2)).containsText("Got it — two adults, no fish")
         assertThat(messages.getMessage(2)).containsText("Got it — two adults, no fish");
     }
 
     @Test
-    void defaultReplyUsedWhenTestForgetsToQueueOne() {
+    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    void defaultReplyUsedWhenTestForgetsToQueueOne(UnifiedPage page) {
+        Page playwright = page.unwrap(Page.class);
+        page.navigate("/welcome");
         // Guardrail: a forgotten queueReply() shouldn't silently call the (unreachable) real LLM.
         // The stub falls back to a sentinel string instead.
-        MessageInputElement input = MessageInputElement.get(page);
-        MessageListElement messages = MessageListElement.get(page);
+        // TODO unified: Dramafinder Escape Hatch: MessageInputElement.get(playwright)
+        MessageInputElement input = MessageInputElement.get(playwright);
+        // TODO unified: Dramafinder Escape Hatch: MessageListElement.get(playwright)
+        MessageListElement messages = MessageListElement.get(playwright);
 
+        // TODO unified: Dramafinder Escape Hatch: input.typeAndSubmit("hello")
         input.typeAndSubmit("hello");
 
+        // TODO unified: Dramafinder Escape Hatch: messages.assertMessageCount(3)
         messages.assertMessageCount(3);
+        // TODO unified: Dramafinder Escape Hatch: assertThat(messages.getMessage(2)).containsText("no reply queued")
         assertThat(messages.getMessage(2)).containsText("no reply queued");
     }
 
@@ -84,15 +124,22 @@ class OnboardingViewIT extends MisePlaywrightIT {
      * column is set correctly for newly written rows.
      */
     @Test
-    void messagesPersistedWithOnboardingViewContext() {
+    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    void messagesPersistedWithOnboardingViewContext(UnifiedPage page) {
+        Page playwright = page.unwrap(Page.class);
+        page.navigate("/welcome");
         chatModel.queueReply("Noted — I'll keep your preferences in mind.");
-        MessageInputElement input = MessageInputElement.get(page);
+        // TODO unified: Dramafinder Escape Hatch: MessageInputElement.get(playwright)
+        MessageInputElement input = MessageInputElement.get(playwright);
 
+        // TODO unified: Dramafinder Escape Hatch: input.typeAndSubmit("Two adults, no allergies, €80/week")
         input.typeAndSubmit("Two adults, no allergies, €80/week");
 
         // Wait for the assistant reply to land in the MessageList before checking the DB,
         // ensuring onResponseComplete has had time to flush to the repository.
-        MessageListElement messages = MessageListElement.get(page);
+        // TODO unified: Dramafinder Escape Hatch: MessageListElement.get(playwright)
+        MessageListElement messages = MessageListElement.get(playwright);
+        // TODO unified: Dramafinder Escape Hatch: messages.assertMessageCount(3)
         messages.assertMessageCount(3);
 
         long onboardingCount = conversationMessageRepository.findAll().stream()

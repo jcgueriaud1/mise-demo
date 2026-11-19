@@ -1,5 +1,13 @@
 package com.example.mise.it;
 
+import com.example.mise.it.support.TestChatModel;
+import com.vaadin.testing.unified.RequiresTestingTool;
+import com.vaadin.testing.unified.TestingTool;
+import com.vaadin.testing.unified.UnifiedPage;
+import com.vaadin.testing.unified.spring.UnifiedSpringBootTest;
+import com.example.mise.it.support.TestAiConfig;
+import org.springframework.context.annotation.Import;
+import org.springframework.test.context.ActiveProfiles;
 import com.example.mise.capabilities.recipes.RecipeCatalog;
 import com.example.mise.domain.conversation.ConversationMessageRepository;
 import com.example.mise.domain.household.Household;
@@ -17,6 +25,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.vaadin.addons.dramafinder.element.MessageInputElement;
 
 import java.math.BigDecimal;
+
+import com.microsoft.playwright.Page;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 
@@ -39,7 +49,18 @@ import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertTha
  * <p>Setup mirrors {@link ChatDockIT}: seed a household + active plan so the Plan view
  * (which hosts the shared dock) renders.
  */
-class ChatBusyStopIT extends MisePlaywrightIT {
+@ActiveProfiles("it")
+@Import(TestAiConfig.class)
+@UnifiedSpringBootTest
+class ChatBusyStopIT {
+
+    @Autowired
+    TestChatModel chatModel;
+
+    @BeforeEach
+    void resetChatModelBetweenTests() {
+        chatModel.reset();
+    }
 
     @Autowired private HouseholdService householdService;
     @Autowired private HouseholdRepository householdRepository;
@@ -50,14 +71,8 @@ class ChatBusyStopIT extends MisePlaywrightIT {
     @Autowired private RecipeCatalog recipeCatalog;
     @Autowired private ConversationMessageRepository conversationMessageRepository;
 
-    @Override
-    public String getView() {
-        return "/plan";
-    }
-
-    @Override
     @BeforeEach
-    public void setupTest() throws Exception {
+    void seedBeforeNavigation() throws Exception {
         Household h = new Household();
         h.setName("IT BusyStop Household");
         h.setSize(2);
@@ -68,8 +83,6 @@ class ChatBusyStopIT extends MisePlaywrightIT {
 
         var household = householdService.findHousehold().orElseThrow();
         planService.generateActivePlan(household, recipeCatalog);
-
-        super.setupTest();
     }
 
     @AfterEach
@@ -91,28 +104,41 @@ class ChatBusyStopIT extends MisePlaywrightIT {
      * busy note appears and the ignored prompt is not echoed into the conversation.
      */
     @Test
-    void submittingWhileBusy_showsBusyNote_andSuppressesPrompt() throws Exception {
+    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    void submittingWhileBusy_showsBusyNote_andSuppressesPrompt(UnifiedPage page) throws Exception {
+        Page playwright = page.unwrap(Page.class);
+        page.navigate("/plan");
         CountDownLatch responseLatch = chatModel.pauseNextResponse();
         chatModel.queueReply("Sure — Thursday is Roasted Vegetable Pasta.");
 
-        var chatDock = page.getByTestId("chat-dock");
+        // TODO unified: Dramafinder Escape Hatch: playwright.getByTestId("chat-dock")
+        var chatDock = playwright.getByTestId("chat-dock");
+        // TODO unified: Dramafinder Escape Hatch: MessageInputElement.get(chatDock)
         MessageInputElement input = MessageInputElement.get(chatDock);
 
         // First turn — held in flight by the pause latch.
+        // TODO unified: Dramafinder Escape Hatch: // First turn — held in flight by the pause latch.input.typeAndSubmit("Swap Thursday for something vegetarian.")
         input.typeAndSubmit("Swap Thursday for something vegetarian.");
-        page.waitForFunction("d => d.classList.contains('ai-working')", chatDock.elementHandle());
+        // TODO unified: Dramafinder Escape Hatch: playwright.waitForFunction("d => d.classList.contains('ai-working')", chatDock.elementHandle())
+        playwright.waitForFunction("d => d.classList.contains('ai-working')", chatDock.elementHandle());
 
         // Second submit while busy: must be suppressed and surfaced as a busy note.
+        // TODO unified: Dramafinder Escape Hatch: // Second submit while busy: must be suppressed and surfaced as a busy note.input.typeAndSubmit("and also add chicken on Friday")
         input.typeAndSubmit("and also add chicken on Friday");
 
-        var busyNote = page.getByTestId("chat-busy-note");
-        page.waitForFunction("n => n && getComputedStyle(n).display !== 'none' && n.textContent.trim().length > 0",
+        // TODO unified: Dramafinder Escape Hatch: playwright.getByTestId("chat-busy-note")
+        var busyNote = playwright.getByTestId("chat-busy-note");
+        // TODO unified: Dramafinder Escape Hatch: playwright.waitForFunction("n => n && getComputedStyle(n).display !== 'none' && n.textContent.trim().length > 0",busyNote.elementHandle())
+        playwright.waitForFunction("n => n && getComputedStyle(n).display !== 'none' && n.textContent.trim().length > 0",
                 busyNote.elementHandle());
+        // TODO unified: Dramafinder Escape Hatch: assertThat(busyNote).isVisible()
         assertThat(busyNote).isVisible();
+        // TODO unified: Dramafinder Escape Hatch: assertThat(busyNote).containsText("still working")
         assertThat(busyNote).containsText("still working");
 
         // The suppressed prompt must NOT appear as a chat message.
-        Boolean suppressedEchoed = (Boolean) page.evaluate(
+        // TODO unified: Dramafinder Escape Hatch: playwright.evaluate("() => [...document.querySelectorAll('vaadin-message')]"+ ".some(m => (m.textContent || '').includes('add chicken on Friday'))")
+        Boolean suppressedEchoed = (Boolean) playwright.evaluate(
                 "() => [...document.querySelectorAll('vaadin-message')]"
                 + ".some(m => (m.textContent || '').includes('add chicken on Friday'))");
         Assertions.assertThat(suppressedEchoed)
@@ -120,8 +146,10 @@ class ChatBusyStopIT extends MisePlaywrightIT {
 
         // Let the first turn finish; the note clears on response-complete.
         responseLatch.countDown();
-        page.waitForFunction("d => !d.classList.contains('ai-working')", chatDock.elementHandle());
-        page.waitForFunction("n => getComputedStyle(n).display === 'none' || n.offsetParent === null",
+        // TODO unified: Dramafinder Escape Hatch: playwright.waitForFunction("d => !d.classList.contains('ai-working')", chatDock.elementHandle())
+        playwright.waitForFunction("d => !d.classList.contains('ai-working')", chatDock.elementHandle());
+        // TODO unified: Dramafinder Escape Hatch: playwright.waitForFunction("n => getComputedStyle(n).display === 'none' || n.offsetParent === null",busyNote.elementHandle())
+        playwright.waitForFunction("n => getComputedStyle(n).display === 'none' || n.offsetParent === null",
                 busyNote.elementHandle());
     }
 
@@ -130,14 +158,23 @@ class ChatBusyStopIT extends MisePlaywrightIT {
      * never called.
      */
     @Test
-    void stopWhileIdle_showsNothingRunning_andNeverCallsModel() {
-        var chatDock = page.getByTestId("chat-dock");
+    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    void stopWhileIdle_showsNothingRunning_andNeverCallsModel(UnifiedPage page) {
+        Page playwright = page.unwrap(Page.class);
+        page.navigate("/plan");
+        // TODO unified: Dramafinder Escape Hatch: playwright.getByTestId("chat-dock")
+        var chatDock = playwright.getByTestId("chat-dock");
+        // TODO unified: Dramafinder Escape Hatch: MessageInputElement.get(chatDock).typeAndSubmit("stop")
         MessageInputElement.get(chatDock).typeAndSubmit("stop");
 
-        var busyNote = page.getByTestId("chat-busy-note");
-        page.waitForFunction("n => n && getComputedStyle(n).display !== 'none' && n.textContent.trim().length > 0",
+        // TODO unified: Dramafinder Escape Hatch: playwright.getByTestId("chat-busy-note")
+        var busyNote = playwright.getByTestId("chat-busy-note");
+        // TODO unified: Dramafinder Escape Hatch: playwright.waitForFunction("n => n && getComputedStyle(n).display !== 'none' && n.textContent.trim().length > 0",busyNote.elementHandle())
+        playwright.waitForFunction("n => n && getComputedStyle(n).display !== 'none' && n.textContent.trim().length > 0",
                 busyNote.elementHandle());
+        // TODO unified: Dramafinder Escape Hatch: assertThat(busyNote).isVisible()
         assertThat(busyNote).isVisible();
+        // TODO unified: Dramafinder Escape Hatch: assertThat(busyNote).containsText("Nothing is running")
         assertThat(busyNote).containsText("Nothing is running");
 
         Assertions.assertThat(chatModel.receivedPrompts())
@@ -151,16 +188,24 @@ class ChatBusyStopIT extends MisePlaywrightIT {
      * Casing/whitespace are ignored ("  STOP ").
      */
     @Test
-    void stopWhileBusy_cancelsTurn_keepsPartialWithStoppedMarker() {
+    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    void stopWhileBusy_cancelsTurn_keepsPartialWithStoppedMarker(UnifiedPage page) {
+        Page playwright = page.unwrap(Page.class);
+        page.navigate("/plan");
         chatModel.holdNextResponseOpen("Here is what I am working on");
 
-        var chatDock = page.getByTestId("chat-dock");
+        // TODO unified: Dramafinder Escape Hatch: playwright.getByTestId("chat-dock")
+        var chatDock = playwright.getByTestId("chat-dock");
+        // TODO unified: Dramafinder Escape Hatch: MessageInputElement.get(chatDock)
         MessageInputElement input = MessageInputElement.get(chatDock);
 
+        // TODO unified: Dramafinder Escape Hatch: input.typeAndSubmit("Write me a very long detailed plan for the whole week.")
         input.typeAndSubmit("Write me a very long detailed plan for the whole week.");
-        page.waitForFunction("d => d.classList.contains('ai-working')", chatDock.elementHandle());
+        // TODO unified: Dramafinder Escape Hatch: playwright.waitForFunction("d => d.classList.contains('ai-working')", chatDock.elementHandle())
+        playwright.waitForFunction("d => d.classList.contains('ai-working')", chatDock.elementHandle());
         // The held partial chunk has streamed into the assistant bubble.
-        page.waitForFunction(
+        // TODO unified: Dramafinder Escape Hatch: // The held partial chunk has streamed into the assistant bubble.playwright.waitForFunction("() => [...document.querySelectorAll('vaadin-message')]"+ ".some(m => (m.textContent || '').includes('what I am working on'))")
+        playwright.waitForFunction(
                 "() => [...document.querySelectorAll('vaadin-message')]"
                 + ".some(m => (m.textContent || '').includes('what I am working on'))");
 
@@ -168,16 +213,20 @@ class ChatBusyStopIT extends MisePlaywrightIT {
 
         // Cancel. The model only emitted one chunk and never completed, so the turn can only
         // end via this cancel — not via a natural completion or the 10s stub timeout.
+        // TODO unified: Dramafinder Escape Hatch: // Cancel. The model only emitted one chunk and never completed, so the turn can only// end via this cancel — not via a natural completion or the 10s stub timeout.input.typeAndSubmit("  STOP ")
         input.typeAndSubmit("  STOP ");
 
         // .ai-working clears because the stream was cancelled.
-        page.waitForFunction("d => !d.classList.contains('ai-working')", chatDock.elementHandle());
+        // TODO unified: Dramafinder Escape Hatch: // .ai-working clears because the stream was cancelled.playwright.waitForFunction("d => !d.classList.contains('ai-working')", chatDock.elementHandle())
+        playwright.waitForFunction("d => !d.classList.contains('ai-working')", chatDock.elementHandle());
 
         // The partial reply survives, marked (stopped).
-        page.waitForFunction(
+        // TODO unified: Dramafinder Escape Hatch: // The partial reply survives, marked (stopped).playwright.waitForFunction("() => [...document.querySelectorAll('vaadin-message')]"+ ".some(m => /\\(stopped\\)/.test(m.textContent || ''))")
+        playwright.waitForFunction(
                 "() => [...document.querySelectorAll('vaadin-message')]"
                 + ".some(m => /\\(stopped\\)/.test(m.textContent || ''))");
-        Boolean stoppedKept = (Boolean) page.evaluate(
+        // TODO unified: Dramafinder Escape Hatch: playwright.evaluate("() => [...document.querySelectorAll('vaadin-message')]"+ ".some(m => (m.textContent || '').includes('what I am working on')"+ " && /\\(stopped\\)/.test(m.textContent || ''))")
+        Boolean stoppedKept = (Boolean) playwright.evaluate(
                 "() => [...document.querySelectorAll('vaadin-message')]"
                 + ".some(m => (m.textContent || '').includes('what I am working on')"
                 + " && /\\(stopped\\)/.test(m.textContent || ''))");

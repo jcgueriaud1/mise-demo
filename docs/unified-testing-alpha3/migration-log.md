@@ -13,7 +13,7 @@ Issues found along the way: [`findings.md`](findings.md)
 | 2 | Bump DramaFinder 1.2.0 → 2.2.0 | **Done**: IT 74 ✓, no code changes |
 | 3 | Baseline commit before the recipe | **Done**: the step 2 commit is the baseline |
 | 4 | Run the OpenRewrite migration recipes | **Done**: 2 of 13 UI test classes converted; 1 library workaround |
-| 5 | Hand-convert the `MisePlaywrightIT` base class, re-run the recipe | Not started |
+| 5 | Hand-prepare the skipped ITs, re-run the recipe | **Done**: 12/12 ITs converted, 74 ✓ on Playwright, 285 markers |
 | 6 | Configure the test layers (Playwright + Browserless) | Not started |
 | 7 | Resolve the Migration Markers | Not started |
 | 8 | Add the `UnifiedStyleTest` (ArchUnit style rules) | Not started |
@@ -223,3 +223,48 @@ The step 2 commit is the baseline the recipe runs against: Vaadin 25.3.5, DramaF
    … 1 call outside the Unified API (Escape Hatch)
 ```
 `-Pit` was not run in this step. `HomeViewIT` is known to be mis-configured (no `it` profile) until step 5, and failsafe still runs it on Browserless by default (step 6).
+
+---
+
+## Step 5: Make the skipped ITs migratable, re-run the recipe (2026-11-19)
+
+The recipe skips a class that uses any base-class member it doesn't convert (F6). So the job was to remove those members *before* the recipe, using a small script (`prep_its.py`, kept in the session scratchpad and not committed), and then let the recipe do the conversion.
+
+**Preparation, applied to the 11 skipped classes:**
+- `extends MisePlaywrightIT` / `AbstractBasePlaywrightIT` → DramaFinder's own `org.vaadin.addons.dramafinder.spring.SpringPlaywrightIT`, which brings `@SpringBootTest(RANDOM_PORT)` and `getUrl()`.
+- `@ActiveProfiles("it")` + `@Import(TestAiConfig.class)` declared **on each class**. On the base class, the recipe drops them (F10).
+- `TestChatModel chatModel` and its `reset()` `@BeforeEach` declared locally, instead of inherited.
+- The `setupTest()` overrides (seed data, then `super.setupTest()` to navigate) became a plain `@BeforeEach void seedBeforeNavigation()` without the `super` call. The recipe moves the navigation from `getView()` into the start of each test, which runs after every `@BeforeEach`, so "seed, then navigate" still holds.
+- ManualExamples ITs: dropped their own `getUrl()` / `@LocalServerPort`, which `SpringPlaywrightIT` provides.
+- Deleted `MisePlaywrightIT`, since nothing extends it any more. Its screenshot-on-failure `TestWatcher` is replaced by Unified's evidence directory, which step 6 wires into CI.
+- `HomeViewIT`, migrated in step 4: restored `@ActiveProfiles("it")` + `@Import(TestAiConfig.class)`.
+
+**Second recipe run:** converted 6 more classes. `OnboardingViewIT`, `OnboardingRedirectIT`, `ChatDockIT`, `ChatBusyStopIT` and both ManualExamples ITs.
+**Still skipped:** the 5 classes that call `page.navigate(getUrl() + "/plan?week=…")`. `getUrl()` is a base-class member too (finding F16). Each class got a private `baseUrl()` built from its own `@LocalServerPort` field.
+**Third recipe run:** converted those 5. All 12 IT classes now use `@UnifiedSpringBootTest` + `UnifiedPage`.
+
+**What came out:**
+
+| Class | Tests | Migration Markers | Tests on `@RequiresTestingTool(PLAYWRIGHT)` |
+|---|---|---|---|
+| PlanViewIT | 19 | 59 | 18 |
+| WeekNavigationIT | 13 | 57 | 13 |
+| ShoppingViewIT | 12 | 44 | 12 |
+| ChatDockIT | 3 | 28 | 3 |
+| ChatBusyStopIT | 3 | 27 | 3 |
+| ReportsViewIT | 11 | 27 | 11 |
+| OnboardingViewIT | 4 | 18 | 4 |
+| GenerateFutureWeeksIT | 5 | 12 | 4 |
+| ManualExamplesStopIT | 1 | 7 | 1 |
+| HomeViewIT | 3 | 3 | 3 |
+| ManualExamplesReportsIT | 3 | 2 | 3 |
+| OnboardingRedirectIT | 1 | 1 | 1 |
+| **Total** | **78** | **285** | **76** |
+
+So 2 tests came out fully Unified and the rest is Escape Hatch with markers, as expected given that the code is mostly raw `locator("#id")` plus the MessageInput/MessageList elements (F7, F8).
+
+**Results:** `./mvnw -Pit verify -Dvaadin.testing.tool=playwright` gives **74 ITs, 0 failures**. That is the same set and count as before the migration; the 4 ManualExamples tests are excluded by tag. The unit layer gives 193 with 1 skipped: the `-D` flag also reached surefire, so `PlanViewBrowserlessTest` (`@RequiresTestingTool(BROWSERLESS)`) was skipped. Step 6 scopes the property to failsafe.
+
+`resolve-migration-markers` still wasn't generated, even though markers now exist before the run. So F11 isn't the scan-order cause I first guessed.
+
+**How it went:** the recipe is all-or-nothing per class and silent about why it skips one. Getting from 1/12 to 12/12 took two "remove one more base-class member" iterations, each found by elimination, by comparing the converted classes with the skipped ones. Once a class qualified, the conversion was mechanical and correct, and the class-level annotations survived.

@@ -124,3 +124,13 @@ The Browserless build recipe keeps `browserless-test-spring`, which is correct, 
 
 `AddUnifiedTestingSkill` writes the skill pointer to `AGENTS.md`. Claude Code reads `CLAUDE.md`, not `AGENTS.md`, and this project has a `CLAUDE.md` and no `AGENTS.md`. The pointer only works because the skill is also under `.claude/skills/`, where Claude Code discovers it.
 **Suggestion:** when `CLAUDE.md` exists and `AGENTS.md` doesn't, add the marked section to `CLAUDE.md`, or have it import `AGENTS.md`.
+
+### F16: `getUrl()` in a test body also blocks the whole class. Verified
+
+`page.navigate(getUrl() + "/plan?week=" + monday)` is how DramaFinder tests open a view with query parameters. `getUrl()` is a base-class member the recipe doesn't convert, so the 5 classes that do this were skipped entirely, again without a marker. Since `UnifiedPage.navigate(String)` takes a path, `navigate(getUrl() + "/x")` maps mechanically to `page.navigate("/x")`.
+**Suggestion:** convert the `getUrl() + "<path>"` pattern. More generally, convert what can be converted and mark the rest, instead of skipping a class over a single member.
+
+### F17: Getting a real suite migrated takes repeated "find what blocks it" passes. Verified (process)
+
+In Mise the recipe converted 1/12 IT classes on the first run, 7/12 after the base class was removed, and 12/12 after `getUrl()` was removed. Each blocker was found by comparing converted and skipped classes, because the recipe reports neither which classes it skipped nor why. Also note that a class-level `@BeforeEach` override of `setupTest()` (seed, then `super.setupTest()`) is the standard DramaFinder idiom for "seed before navigating", and the recipe could convert it directly: the `@BeforeEach` stays and the navigation moves into the test.
+**Suggestion:** a dry-run report recipe (`FindDramafinderTests` with reasons): "skipped `PlanViewIT`: uses `setupTest()` override, `getUrl()`".

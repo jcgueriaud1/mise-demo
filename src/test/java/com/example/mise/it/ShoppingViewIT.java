@@ -1,5 +1,14 @@
 package com.example.mise.it;
 
+import org.springframework.boot.test.web.server.LocalServerPort;
+import com.example.mise.it.support.TestChatModel;
+import com.vaadin.testing.unified.RequiresTestingTool;
+import com.vaadin.testing.unified.TestingTool;
+import com.vaadin.testing.unified.UnifiedPage;
+import com.vaadin.testing.unified.spring.UnifiedSpringBootTest;
+import com.example.mise.it.support.TestAiConfig;
+import org.springframework.context.annotation.Import;
+import org.springframework.test.context.ActiveProfiles;
 import com.example.mise.capabilities.recipes.RecipeCatalog;
 import com.example.mise.domain.conversation.ConversationMessageRepository;
 import com.example.mise.domain.household.Household;
@@ -17,6 +26,8 @@ import com.example.mise.domain.shopping.PantryRepository;
 import com.example.mise.domain.shopping.PantryService;
 
 import com.microsoft.playwright.Locator;
+import com.microsoft.playwright.Page;
+
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -40,7 +51,25 @@ import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertTha
  * meal_edit → extra_shopping_item → pantry_item → view_preference →
  * conversation_message → meal → plan → household.
  */
-class ShoppingViewIT extends MisePlaywrightIT {
+@ActiveProfiles("it")
+@Import(TestAiConfig.class)
+@UnifiedSpringBootTest
+class ShoppingViewIT {
+
+    @LocalServerPort
+    int port;
+
+    private String baseUrl() {
+        return "http://localhost:" + port;
+    }
+
+    @Autowired
+    TestChatModel chatModel;
+
+    @BeforeEach
+    void resetChatModelBetweenTests() {
+        chatModel.reset();
+    }
 
     @Autowired
     private HouseholdService householdService;
@@ -78,20 +107,14 @@ class ShoppingViewIT extends MisePlaywrightIT {
     @Autowired
     private ExtraShoppingItemRepository extraShoppingItemRepository;
 
-    @Override
-    public String getView() {
-        return "/shopping";
-    }
-
     /**
      * Override: seed Household + active plan BEFORE the base class navigates to /shopping.
      * The plan is generated via the standard production path (picks 7 recipes).
      * Both salmon-pasta and tuna-pasta share "pasta" (400 g each) and "garlic" (3 cloves each),
      * which enables AC #2 (consolidation) and AC #5 (already-have on garlic) assertions.
      */
-    @Override
     @BeforeEach
-    public void setupTest() throws Exception {
+    void seedBeforeNavigation() throws Exception {
         // Seed household
         Household h = new Household();
         h.setName("IT Shopping Household");
@@ -104,9 +127,6 @@ class ShoppingViewIT extends MisePlaywrightIT {
         // Generate the active plan using the production path (7 meals from catalog).
         var household = householdService.findHousehold().orElseThrow();
         planService.generateActivePlan(household, recipeCatalog);
-
-        // Navigate AFTER seeding so ShoppingView.beforeEnter() finds the household and plan.
-        super.setupTest();
     }
 
     @AfterEach
@@ -134,8 +154,12 @@ class ShoppingViewIT extends MisePlaywrightIT {
      * AC #1 (route/title): visiting /shopping loads the correct page title.
      */
     @Test
-    void hasPageTitle() {
-        assertThat(page).hasTitle("Mise — Shopping");
+    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    void hasPageTitle(UnifiedPage page) {
+        Page playwright = page.unwrap(Page.class);
+        page.navigate("/shopping");
+        // TODO unified: Dramafinder Escape Hatch: assertThat(playwright).hasTitle("Mise — Shopping")
+        assertThat(playwright).hasTitle("Mise — Shopping");
     }
 
     /**
@@ -146,16 +170,25 @@ class ShoppingViewIT extends MisePlaywrightIT {
      * recommendation-panel headline carries a non-empty store name on desktop.
      */
     @Test
-    void recommendedStoreBadgeIsVisible() {
+    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    void recommendedStoreBadgeIsVisible(UnifiedPage page) {
+        Page playwright = page.unwrap(Page.class);
+        page.navigate("/shopping");
         // Store badge is in the DOM (for mobile) but hidden on desktop — check it's attached
-        Locator badge = page.locator("#mise-shopping-store-recommended");
+        // TODO unified: Dramafinder Escape Hatch: playwright.locator("#mise-shopping-store-recommended")
+        Locator badge = playwright.locator("#mise-shopping-store-recommended");
+        // TODO unified: Dramafinder Escape Hatch: assertThat(badge).isAttached()
         assertThat(badge).isAttached();
 
         // The store name is always visible via the recommendation panel headline on desktop
-        Locator storeHeadline = page.getByTestId("recommendation-panel")
+        // TODO unified: Dramafinder Escape Hatch: playwright.getByTestId("recommendation-panel").locator(".mise-shopping-rec-store-name")
+        Locator storeHeadline = playwright.getByTestId("recommendation-panel")
                 .locator(".mise-shopping-rec-store-name");
+        // TODO unified: Dramafinder Escape Hatch: assertThat(storeHeadline).isVisible()
         assertThat(storeHeadline).isVisible();
+        // TODO unified: Dramafinder Escape Hatch: assertThat(storeHeadline).not().hasText("—")
         assertThat(storeHeadline).not().hasText("—");
+        // TODO unified: Dramafinder Escape Hatch: assertThat(storeHeadline).not().isEmpty()
         assertThat(storeHeadline).not().isEmpty();
     }
 
@@ -163,9 +196,15 @@ class ShoppingViewIT extends MisePlaywrightIT {
      * AC #1: the total-cost span is visible and contains a € sign.
      */
     @Test
-    void totalCostSpanShowsEuroSign() {
-        Locator totalCost = page.getByTestId("shopping-total-cost");
+    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    void totalCostSpanShowsEuroSign(UnifiedPage page) {
+        Page playwright = page.unwrap(Page.class);
+        page.navigate("/shopping");
+        // TODO unified: Dramafinder Escape Hatch: playwright.getByTestId("shopping-total-cost")
+        Locator totalCost = playwright.getByTestId("shopping-total-cost");
+        // TODO unified: Dramafinder Escape Hatch: assertThat(totalCost).isVisible()
         assertThat(totalCost).isVisible();
+        // TODO unified: Dramafinder Escape Hatch: assertThat(totalCost).containsText("€")
         assertThat(totalCost).containsText("€");
     }
 
@@ -175,10 +214,17 @@ class ShoppingViewIT extends MisePlaywrightIT {
      * (mobile strip + desktop panel); on desktop only the panel instance is visible.
      */
     @Test
-    void storeModeToggleIsVisible() {
-        Locator panel = page.getByTestId("recommendation-panel");
+    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    void storeModeToggleIsVisible(UnifiedPage page) {
+        Page playwright = page.unwrap(Page.class);
+        page.navigate("/shopping");
+        // TODO unified: Dramafinder Escape Hatch: playwright.getByTestId("recommendation-panel")
+        Locator panel = playwright.getByTestId("recommendation-panel");
+        // TODO unified: Dramafinder Escape Hatch: assertThat(panel.getByTestId("store-mode-toggle")).isVisible()
         assertThat(panel.getByTestId("store-mode-toggle")).isVisible();
+        // TODO unified: Dramafinder Escape Hatch: assertThat(panel.getByTestId("store-mode-one")).isVisible()
         assertThat(panel.getByTestId("store-mode-one")).isVisible();
+        // TODO unified: Dramafinder Escape Hatch: assertThat(panel.getByTestId("store-mode-mix")).isVisible()
         assertThat(panel.getByTestId("store-mode-mix")).isVisible();
     }
 
@@ -186,18 +232,28 @@ class ShoppingViewIT extends MisePlaywrightIT {
      * AC #1: the pantry section (collapsed by default) is present in the DOM.
      */
     @Test
-    void pantrySectionExistsInDom() {
-        assertThat(page.getByTestId("pantry-section")).isAttached();
+    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    void pantrySectionExistsInDom(UnifiedPage page) {
+        Page playwright = page.unwrap(Page.class);
+        page.navigate("/shopping");
+        // TODO unified: Dramafinder Escape Hatch: assertThat(playwright.getByTestId("pantry-section")).isAttached()
+        assertThat(playwright.getByTestId("pantry-section")).isAttached();
     }
 
     /**
      * AC #1: at least one aisle group is rendered when the plan is seeded.
      */
     @Test
-    void atLeastOneAisleGroupRendered() {
-        Locator aisleGroups = page.locator("[id^='mise-shopping-aisle-']");
+    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    void atLeastOneAisleGroupRendered(UnifiedPage page) {
+        Page playwright = page.unwrap(Page.class);
+        page.navigate("/shopping");
+        // TODO unified: Dramafinder Escape Hatch: playwright.locator("[id^='mise-shopping-aisle-']")
+        Locator aisleGroups = playwright.locator("[id^='mise-shopping-aisle-']");
+        // TODO unified: Dramafinder Escape Hatch: assertThat(aisleGroups.first()).isVisible()
         assertThat(aisleGroups.first()).isVisible();
         // Require at least 1 aisle group
+        // TODO unified: Dramafinder Escape Hatch: aisleGroups.count()
         int count = aisleGroups.count();
         Assertions.assertThat(count).isGreaterThanOrEqualTo(1);
     }
@@ -206,9 +262,15 @@ class ShoppingViewIT extends MisePlaywrightIT {
      * AC #1: at least one shopping row is rendered.
      */
     @Test
-    void atLeastOneShoppingRowRendered() {
-        Locator rows = page.getByTestId("shopping-row");
+    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    void atLeastOneShoppingRowRendered(UnifiedPage page) {
+        Page playwright = page.unwrap(Page.class);
+        page.navigate("/shopping");
+        // TODO unified: Dramafinder Escape Hatch: playwright.getByTestId("shopping-row")
+        Locator rows = playwright.getByTestId("shopping-row");
+        // TODO unified: Dramafinder Escape Hatch: assertThat(rows.first()).isVisible()
         assertThat(rows.first()).isVisible();
+        // TODO unified: Dramafinder Escape Hatch: rows.count()
         int count = rows.count();
         Assertions.assertThat(count).isGreaterThanOrEqualTo(1);
     }
@@ -227,10 +289,15 @@ class ShoppingViewIT extends MisePlaywrightIT {
      * and unit.
      */
     @Test
-    void pastaIngredientAppearsAtMostOnce() {
+    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    void pastaIngredientAppearsAtMostOnce(UnifiedPage page) {
+        Page playwright = page.unwrap(Page.class);
+        page.navigate("/shopping");
         // Find all shopping rows whose visible text contains "pasta"
-        Locator pastaRows = page.locator("[data-testid='shopping-row']")
+        // TODO unified: Dramafinder Escape Hatch: playwright.locator("[data-testid='shopping-row']").filter(new Locator.FilterOptions().setHasText("pasta"))
+        Locator pastaRows = playwright.locator("[data-testid='shopping-row']")
                 .filter(new Locator.FilterOptions().setHasText("pasta"));
+        // TODO unified: Dramafinder Escape Hatch: pastaRows.count()
         int count = pastaRows.count();
         // Consolidation rule: cannot have more than 1 row for the same ingredient+unit combo
         Assertions.assertThat(count)
@@ -244,7 +311,10 @@ class ShoppingViewIT extends MisePlaywrightIT {
      * olive oil appears in tuna-pasta and lentil-soup; as a staple it must be suppressed.
      */
     @Test
-    void stapleOliveOilIsSuppressedFromShoppingList() {
+    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    void stapleOliveOilIsSuppressedFromShoppingList(UnifiedPage page) {
+        Page playwright = page.unwrap(Page.class);
+        page.navigate("/shopping");
         // Save a staple pantry item for olive oil BEFORE re-navigating
         var household = householdService.findHousehold().orElseThrow();
         var oliveOil = new PantryItem();
@@ -254,11 +324,14 @@ class ShoppingViewIT extends MisePlaywrightIT {
         pantryService.save(oliveOil);
 
         // Reload the view so ShoppingService re-derives with the new pantry staple
-        page.navigate(getUrl() + "/shopping");
+        // TODO unified: Dramafinder Escape Hatch: // Reload the view so ShoppingService re-derives with the new pantry stapleplaywright.navigate(baseUrl() + "/shopping")
+        playwright.navigate(baseUrl() + "/shopping");
 
         // Assert there is no shopping row whose visible text contains "olive oil"
-        Locator oliveOilRows = page.locator("[data-testid='shopping-row']")
+        // TODO unified: Dramafinder Escape Hatch: playwright.locator("[data-testid='shopping-row']").filter(new Locator.FilterOptions().setHasText("olive oil"))
+        Locator oliveOilRows = playwright.locator("[data-testid='shopping-row']")
                 .filter(new Locator.FilterOptions().setHasText("olive oil"));
+        // TODO unified: Dramafinder Escape Hatch: oliveOilRows.count()
         Assertions.assertThat(oliveOilRows.count())
                 .as("AC #3: olive oil (staple) must be suppressed from the shopping list")
                 .isZero();
@@ -270,15 +343,21 @@ class ShoppingViewIT extends MisePlaywrightIT {
      * button retains the "active" CSS class.
      */
     @Test
-    void storeModeTogglePersistsAcrossReload() {
+    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    void storeModeTogglePersistsAcrossReload(UnifiedPage page) {
+        Page playwright = page.unwrap(Page.class);
+        page.navigate("/shopping");
         // Scope to the recommendation panel — both strip and panel have the same data-testids;
         // on desktop the panel is the visible/interactive one.
-        Locator panel = page.getByTestId("recommendation-panel");
+        // TODO unified: Dramafinder Escape Hatch: playwright.getByTestId("recommendation-panel")
+        Locator panel = playwright.getByTestId("recommendation-panel");
 
         // Click the "Cheapest mix" button
+        // TODO unified: Dramafinder Escape Hatch: // Click the "Cheapest mix" buttonpanel.getByTestId("store-mode-mix").click()
         panel.getByTestId("store-mode-mix").click();
 
         // Wait for the view to rebuild (the button should now have the "active" class)
+        // TODO unified: Dramafinder Escape Hatch: // Wait for the view to rebuild (the button should now have the "active" class)assertThat(panel.getByTestId("store-mode-mix")).hasClass(new java.util.regex.Pattern[]{java.util.regex.Pattern.compile("active")})
         assertThat(panel.getByTestId("store-mode-mix")).hasClass(
                 new java.util.regex.Pattern[]{java.util.regex.Pattern.compile("active")});
 
@@ -294,16 +373,20 @@ class ShoppingViewIT extends MisePlaywrightIT {
                 .contains("CHEAPEST_MIX");
 
         // Reload the page — the preference must be restored from DB
-        page.reload();
+        // TODO unified: Dramafinder Escape Hatch: // Reload the page — the preference must be restored from DBplaywright.reload()
+        playwright.reload();
 
         // Re-scope after reload
-        Locator panelAfterReload = page.getByTestId("recommendation-panel");
+        // TODO unified: Dramafinder Escape Hatch: playwright.getByTestId("recommendation-panel")
+        Locator panelAfterReload = playwright.getByTestId("recommendation-panel");
 
         // After reload, the Cheapest-mix button must still carry the "active" class
+        // TODO unified: Dramafinder Escape Hatch: // After reload, the Cheapest-mix button must still carry the "active" classassertThat(panelAfterReload.getByTestId("store-mode-mix")).hasClass(new java.util.regex.Pattern[]{java.util.regex.Pattern.compile("active")})
         assertThat(panelAfterReload.getByTestId("store-mode-mix")).hasClass(
                 new java.util.regex.Pattern[]{java.util.regex.Pattern.compile("active")});
 
         // And the One-store button must NOT carry the "active" class
+        // TODO unified: Dramafinder Escape Hatch: // And the One-store button must NOT carry the "active" classassertThat(panelAfterReload.getByTestId("store-mode-one")).not().hasClass(new java.util.regex.Pattern[]{java.util.regex.Pattern.compile("active")})
         assertThat(panelAfterReload.getByTestId("store-mode-one")).not().hasClass(
                 new java.util.regex.Pattern[]{java.util.regex.Pattern.compile("active")});
     }
@@ -314,18 +397,25 @@ class ShoppingViewIT extends MisePlaywrightIT {
      * and (b) creates a non-staple PantryItem for that ingredient.
      */
     @Test
-    void alreadyHaveButtonRemovesRowAndCreatesPantryItem() {
-        Locator rows = page.getByTestId("shopping-row");
+    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    void alreadyHaveButtonRemovesRowAndCreatesPantryItem(UnifiedPage page) {
+        Page playwright = page.unwrap(Page.class);
+        page.navigate("/shopping");
+        // TODO unified: Dramafinder Escape Hatch: playwright.getByTestId("shopping-row")
+        Locator rows = playwright.getByTestId("shopping-row");
         // Wait for the list to settle before snapshotting the count. Without this
         // the test flakes: rows.count() returns mid-render (e.g. 33 of 34 visible),
         // we click delete, and the final 34th row arrives and is then removed,
         // landing on 32 instead of before-1 = 33. Two consecutive snapshots with
         // a brief delay between them is enough to gate the click on a stable list.
+        // TODO unified: Dramafinder Escape Hatch: // Wait for the list to settle before snapshotting the count. Without this// the test flakes: rows.count() returns mid-render (e.g. 33 of 34 visible),// we click delete, and the final 34th row arrives and is then removed,// landing on 32 instead of before-1 = 33. Two consecutive snapshots with// a brief delay between them is enough to gate the click on a stable list.assertThat(rows.first()).isVisible()
         assertThat(rows.first()).isVisible();
         int before;
+        // TODO unified: Dramafinder Escape Hatch: rows.count()
+        // TODO unified: Dramafinder Escape Hatch: playwright.waitForTimeout(150)
         while (true) {
             int sample = rows.count();
-            page.waitForTimeout(150);
+            playwright.waitForTimeout(150);
             if (sample == rows.count()) { before = sample; break; }
         }
         Assertions.assertThat(before)
@@ -334,14 +424,18 @@ class ShoppingViewIT extends MisePlaywrightIT {
 
         // Get the name of the ingredient in the first row by reading its visible text
         // The item-name span carries class mise-shopping-item-name
+        // TODO unified: Dramafinder Escape Hatch: rows.first()
         Locator firstRow = rows.first();
+        // TODO unified: Dramafinder Escape Hatch: firstRow.locator(".mise-shopping-item-name").innerText()
         String ingredientName = firstRow.locator(".mise-shopping-item-name").innerText().trim();
 
         // Click the "already have" button scoped to the first row
+        // TODO unified: Dramafinder Escape Hatch: // Click the "already have" button scoped to the first rowfirstRow.getByTestId("row-already-have").click()
         firstRow.getByTestId("row-already-have").click();
 
         // AC #5a: the row count must have dropped by exactly one
-        assertThat(page.getByTestId("shopping-row")).hasCount(before - 1);
+        // TODO unified: Dramafinder Escape Hatch: // AC #5a: the row count must have dropped by exactly oneassertThat(playwright.getByTestId("shopping-row")).hasCount(before - 1)
+        assertThat(playwright.getByTestId("shopping-row")).hasCount(before - 1);
 
         // AC #5b: a PantryItem with that ingredient name (non-staple) must exist in DB
         var household = householdService.findHousehold().orElseThrow();
@@ -366,7 +460,10 @@ class ShoppingViewIT extends MisePlaywrightIT {
      * meaningful, so we pick the first non-lentil-soup meal and swap to lentil-soup.
      */
     @Test
-    void planSwapReflowsShoppingList() {
+    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    void planSwapReflowsShoppingList(UnifiedPage page) {
+        Page playwright = page.unwrap(Page.class);
+        page.navigate("/shopping");
         var household = householdService.findHousehold().orElseThrow();
         var plan = planService.findActivePlan(household.getId()).orElseThrow();
 
@@ -381,12 +478,15 @@ class ShoppingViewIT extends MisePlaywrightIT {
         planService.swapMeal(targetMeal.getId(), "lentil-soup", "IT reflow test");
 
         // Navigate back to /shopping — beforeEnter re-derives the list from the updated plan
-        page.navigate(getUrl() + "/shopping");
+        // TODO unified: Dramafinder Escape Hatch: // Navigate back to /shopping — beforeEnter re-derives the list from the updated planplaywright.navigate(baseUrl() + "/shopping")
+        playwright.navigate(baseUrl() + "/shopping");
 
         // "red lentils" is a unique ingredient from lentil-soup; it must now appear in the list
-        Locator redLentilRows = page.locator("[data-testid='shopping-row']")
+        // TODO unified: Dramafinder Escape Hatch: playwright.locator("[data-testid='shopping-row']").filter(new Locator.FilterOptions().setHasText("red lentils"))
+        Locator redLentilRows = playwright.locator("[data-testid='shopping-row']")
                 .filter(new Locator.FilterOptions().setHasText("red lentils"));
         // Playwright LocatorAssertions does not have .as(); the failure message comes from isVisible() timeout
+        // TODO unified: Dramafinder Escape Hatch: // Playwright LocatorAssertions does not have .as(); the failure message comes from isVisible() timeoutassertThat(redLentilRows.first()).isVisible()
         assertThat(redLentilRows.first()).isVisible();
     }
 }

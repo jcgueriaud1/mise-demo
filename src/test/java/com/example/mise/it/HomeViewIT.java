@@ -1,11 +1,14 @@
 package com.example.mise.it;
 
+import com.example.mise.it.support.TestAiConfig;
 import com.microsoft.playwright.Page;
 import com.vaadin.testing.unified.RequiresTestingTool;
 import com.vaadin.testing.unified.TestingTool;
 import com.vaadin.testing.unified.UnifiedPage;
 import com.vaadin.testing.unified.spring.UnifiedSpringBootTest;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.annotation.Import;
+import org.springframework.test.context.ActiveProfiles;
 
 import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
 
@@ -15,6 +18,8 @@ import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertTha
  * or any AI surface: those are covered by separate ITs that stub the {@code ChatModel}.
  */
 @UnifiedSpringBootTest
+@ActiveProfiles("it")
+@Import(TestAiConfig.class)
 class HomeViewIT {
 
     @Test
