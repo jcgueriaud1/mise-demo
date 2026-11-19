@@ -22,6 +22,7 @@ import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.ActiveProfiles;
@@ -118,6 +119,7 @@ class ManualExamplesReportsIT {
 
     // ── #13 — "In the leaderboard, rank by kcal per euro." ─────────────────────
     @Test
+    @DisplayName("Asking to rank the leaderboard by kcal per euro reshapes it (live model)")
     @RequiresTestingTool(TestingTool.PLAYWRIGHT)
     void leaderboardRankByKcalPerEuro_reshapesViaChat(UnifiedPage page) throws InterruptedException {
         page.navigate("/reports");
@@ -139,6 +141,7 @@ class ManualExamplesReportsIT {
     // leaderboard query and inspect its result shape (week-per-row + fish/meat/veg/chicken + a
     // kcal-per-euro value), tolerating the model's exact alias wording.
     @Test
+    @DisplayName("Asking for a weekly meal-type pivot reshapes the leaderboard (live model)")
     @RequiresTestingTool(TestingTool.PLAYWRIGHT)
     void leaderboardWeeklyMealTypePivot_reshapesViaChat(UnifiedPage page) throws InterruptedException {
         page.navigate("/reports");
@@ -183,6 +186,7 @@ class ManualExamplesReportsIT {
     // steering the reporting schema notes to H2's FORMATDATETIME(...) plus a self-correcting error
     // hint in MiseDatabaseProvider (see ReportSnapshotService.SCHEMA_NOTES).
     @Test
+    @DisplayName("Asking for a vegetarian-by-month chart reshapes a chart (live model)")
     @RequiresTestingTool(TestingTool.PLAYWRIGHT)
     void chartVegetarianByMonth_reshapesViaChat(UnifiedPage page) throws InterruptedException {
         page.navigate("/reports");

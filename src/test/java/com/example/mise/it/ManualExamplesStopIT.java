@@ -18,6 +18,7 @@ import com.microsoft.playwright.Page;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.ActiveProfiles;
@@ -92,6 +93,7 @@ class ManualExamplesStopIT {
 
     // ── UC-013 — "stop" cancels an in-flight turn ───────────────────────────────
     @Test
+    @DisplayName("Typing stop cancels a long answer in flight (live model)")
     @RequiresTestingTool(TestingTool.PLAYWRIGHT)
     void stopCancelsAnInFlightTurn(UnifiedPage page) {
         Page playwright = page.unwrap(Page.class);
