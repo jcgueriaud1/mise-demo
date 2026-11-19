@@ -166,3 +166,16 @@ On its first Browserless run, a migrated test failed with `CancellableLLMProvide
 
 `UnifiedGrid.getColumnHeaders()` exists, but `GridAssert` has only `hasRowCount` / `isEmpty`, and `GridColumnAssert` has only sort and cell checks. "The leaderboard now has a *Cooked times* column", the main outcome of an AI grid reshape in Mise, therefore needs `page.waitUntil(() -> grid.getColumnHeaders().contains("Cooked times"))`. That shows as a gap in the reports, and its failure message is weaker.
 **Suggestion:** `assertThat(grid).hasColumn("Cooked times")` / `hasColumnHeaders(..)`, or `assertThat(grid.column("Cooked times")).exists()`.
+
+### F23: `UnifiedDiv` / `UnifiedSpan` have no `click()`. Verified
+
+A `Div` or `Span` with a server-side click listener (`ClickNotifier`) is a common Flow pattern. In Mise the nav tabs, the brand wordmark and the week badge are all built this way, so a user clicks them. The Wrappers offer `getText()` only, so tests have to write `wrapper.element().click()`, which reads worse and probably reports as a gap rather than a "click …" User Step.
+**Suggestion:** give the HTML-container Wrappers (`UnifiedDiv`, `UnifiedSpan`, `UnifiedContainer`, …) a `click()`, perhaps only when the component implements `ClickNotifier`.
+
+### F24: Browserless passes interactions a user can't do when CSS hides the field. Verified (documented limitation, worth a louder note)
+
+`UnifiedDatePicker.setValue(..)` on a picker whose input is hidden by CSS (the week picker opens as a calendar overlay only):
+- **Playwright:** `Found 1, but hidden`. Correct: a user can't type there.
+- **Browserless:** passes, because server-side the field is visible.
+
+The "Running on the other Testing Tools" section of the migration guide mentions that "Visible" means `setVisible(true)` on the server. This is the practical consequence: a test can be green on Browserless and red on Playwright for a real reason. Running both tools in CI (step 6) is what caught it.

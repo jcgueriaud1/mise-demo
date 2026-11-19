@@ -1,14 +1,10 @@
 package com.example.mise.it;
 
-import org.springframework.boot.test.web.server.LocalServerPort;
 import com.example.mise.it.support.TestChatModel;
-import com.vaadin.testing.unified.RequiresTestingTool;
-import com.vaadin.testing.unified.TestingTool;
 import com.vaadin.testing.unified.UnifiedPage;
 import com.vaadin.testing.unified.spring.UnifiedSpringBootTest;
 import com.example.mise.it.support.TestAiConfig;
 
-import com.microsoft.playwright.Page;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 import com.example.mise.capabilities.recipes.RecipeCatalog;
@@ -26,7 +22,15 @@ import com.example.mise.domain.plan.PlanService;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import com.microsoft.playwright.Page;
+import com.vaadin.testing.unified.RequiresTestingTool;
+import com.vaadin.testing.unified.TestingTool;
 import org.junit.jupiter.api.Test;
+import com.vaadin.testing.unified.component.UnifiedButton;
+import com.vaadin.testing.unified.component.UnifiedDatePicker;
+import com.vaadin.testing.unified.component.UnifiedDiv;
+import com.vaadin.testing.unified.component.UnifiedSpan;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import java.math.BigDecimal;
@@ -36,7 +40,7 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.TemporalAdjusters;
 import java.util.List;
 
-import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
+import static com.vaadin.testing.unified.assertion.UnifiedAssertions.assertThat;
 
 /**
  * UC-010 Playwright IT — week navigation header controls (prev / next / badge / DatePicker).
@@ -65,12 +69,6 @@ import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertTha
 @UnifiedSpringBootTest
 class WeekNavigationIT {
 
-    @LocalServerPort
-    int port;
-
-    private String baseUrl() {
-        return "http://localhost:" + port;
-    }
 
     @Autowired
     TestChatModel chatModel;
@@ -188,348 +186,247 @@ class WeekNavigationIT {
      * AC: On the ACTIVE plan's week the header renders with prev enabled and next disabled.
      */
     @Test
-    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    @DisplayName("On the active week, previous week is available and next week isn't")
     void activeWeekHasPrevEnabledAndNextDisabled(UnifiedPage page) {
-        Page playwright = page.unwrap(Page.class);
+        // when: default navigation lands on the active plan (/plan without ?week=)
         page.navigate("/plan");
-        // Default navigation lands on the active plan (/plan without ?week=)
-        // TODO unified: Dramafinder Escape Hatch: // Default navigation lands on the active plan (/plan without ?week=)assertThat(playwright.locator("#mise-week-prev")).isVisible()
-        assertThat(playwright.locator("#mise-week-prev")).isVisible();
-        // TODO unified: Dramafinder Escape Hatch: assertThat(playwright.locator("#mise-week-next")).isVisible()
-        assertThat(playwright.locator("#mise-week-next")).isVisible();
 
-        // Prev must be enabled — there are 2 earlier plans
-        // TODO unified: Dramafinder Escape Hatch: // Prev must be enabled — there are 2 earlier plansassertThat(playwright.locator("#mise-week-prev")).not().hasAttribute("disabled", "")
-        assertThat(playwright.locator("#mise-week-prev")).not().hasAttribute("disabled", "");
-        // TODO unified: Dramafinder Escape Hatch: assertThat(playwright.locator("#mise-week-prev")).not().hasAttribute("aria-disabled", "true")
-        assertThat(playwright.locator("#mise-week-prev")).not().hasAttribute("aria-disabled", "true");
-
-        // Next must be disabled — no plan after active
-        // TODO unified: Dramafinder Escape Hatch: // Next must be disabled — no plan after activeassertThat(playwright.locator("#mise-week-next")).hasAttribute("disabled", "")
-        assertThat(playwright.locator("#mise-week-next")).hasAttribute("disabled", "");
+        // then: two earlier plans, none after the active one
+        assertThat(previousWeekButton(page)).isVisible();
+        assertThat(nextWeekButton(page)).isVisible();
+        assertThat(previousWeekButton(page)).isEnabled();
+        assertThat(nextWeekButton(page)).isDisabled();
     }
 
     /**
      * AC: The week badge shows the active week's Monday formatted as "Week of {MMM d}".
      */
     @Test
-    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    @DisplayName("The week badge shows the active week")
     void activeWeekBadgeShowsActivePlanMonday(UnifiedPage page) {
-        Page playwright = page.unwrap(Page.class);
         page.navigate("/plan");
-        String expected = "Week of " + activePlan.getWeekStartDate().format(WEEK_FMT);
-        // TODO unified: Dramafinder Escape Hatch: assertThat(playwright.locator("#mise-week-badge")).containsText(expected)
-        assertThat(playwright.locator("#mise-week-badge")).containsText(expected);
+        assertThat(weekBadge(page)).hasTextContaining(weekLabel(activePlan));
     }
 
     /**
      * AC: Clicking prev once changes the badge to show the previous (middle) plan's Monday.
-     * Also asserts that the ?week= URL param appears after navigation.
      */
     @Test
-    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    @DisplayName("Going back one week shows the previous week")
     void clickPrevOnceShowsMiddleWeekInBadge(UnifiedPage page) {
-        Page playwright = page.unwrap(Page.class);
         page.navigate("/plan");
-        // TODO unified: Dramafinder Escape Hatch: playwright.locator("#mise-week-prev").click()
-        playwright.locator("#mise-week-prev").click();
-
-        // Wait for badge to update — this implicitly waits for Vaadin navigation to complete
-        String expected = "Week of " + middlePlan.getWeekStartDate().format(WEEK_FMT);
-        // TODO unified: Dramafinder Escape Hatch: assertThat(playwright.locator("#mise-week-badge")).containsText(expected)
-        assertThat(playwright.locator("#mise-week-badge")).containsText(expected);
+        previousWeekButton(page).click();
+        assertThat(weekBadge(page)).hasTextContaining(weekLabel(middlePlan));
     }
 
     /**
      * AC: After clicking prev once, the ?week= param appears in the URL.
-     * Waits for badge update first (guarantees Vaadin navigation has completed).
      */
     @Test
-    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    @DisplayName("Going back one week puts that week in the URL")
     void weekParamAppearsInUrlAfterPrevClick(UnifiedPage page) {
-        Page playwright = page.unwrap(Page.class);
         page.navigate("/plan");
-        // TODO unified: Dramafinder Escape Hatch: playwright.locator("#mise-week-prev").click()
-        playwright.locator("#mise-week-prev").click();
-
-        // Wait for navigation to complete by asserting the badge first
-        String expectedBadge = "Week of " + middlePlan.getWeekStartDate().format(WEEK_FMT);
-        // TODO unified: Dramafinder Escape Hatch: assertThat(playwright.locator("#mise-week-badge")).containsText(expectedBadge)
-        assertThat(playwright.locator("#mise-week-badge")).containsText(expectedBadge);
-
-        // Now the URL must carry ?week=<middle-monday>
-        // TODO unified: Dramafinder Escape Hatch: playwright.url()
-        String url = playwright.url();
-        Assertions.assertThat(url).contains("week=");
-        Assertions.assertThat(url).contains(middlePlan.getWeekStartDate().toString());
+        previousWeekButton(page).click();
+        assertThat(weekBadge(page)).hasTextContaining(weekLabel(middlePlan));
+        assertThat(page).hasQueryParameter("week", middlePlan.getWeekStartDate().toString());
     }
 
     /**
      * AC: Clicking prev twice (from active) lands on the oldest plan; prev is disabled, next is enabled.
      */
     @Test
-    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    @DisplayName("Going back to the oldest week disables previous and enables next")
     void clickPrevTwiceLandsOnOldestPlan(UnifiedPage page) {
-        Page playwright = page.unwrap(Page.class);
+        // given
         page.navigate("/plan");
-        // TODO unified: Dramafinder Escape Hatch: playwright.locator("#mise-week-prev").click()
-        playwright.locator("#mise-week-prev").click();
-        // Wait for middle-week navigation before clicking again
-        // TODO unified: Dramafinder Escape Hatch: // Wait for middle-week navigation before clicking againassertThat(playwright.locator("#mise-week-badge")).containsText("Week of " + middlePlan.getWeekStartDate().format(WEEK_FMT))
-        assertThat(playwright.locator("#mise-week-badge"))
-                .containsText("Week of " + middlePlan.getWeekStartDate().format(WEEK_FMT));
 
-        // TODO unified: Dramafinder Escape Hatch: playwright.locator("#mise-week-prev").click()
-        playwright.locator("#mise-week-prev").click();
+        // when
+        goBackTwoWeeks(page);
 
-        String expected = "Week of " + oldestPlan.getWeekStartDate().format(WEEK_FMT);
-        // TODO unified: Dramafinder Escape Hatch: assertThat(playwright.locator("#mise-week-badge")).containsText(expected)
-        assertThat(playwright.locator("#mise-week-badge")).containsText(expected);
-
-        // At the oldest plan: prev must be disabled
-        // TODO unified: Dramafinder Escape Hatch: // At the oldest plan: prev must be disabledassertThat(playwright.locator("#mise-week-prev")).hasAttribute("disabled", "")
-        assertThat(playwright.locator("#mise-week-prev")).hasAttribute("disabled", "");
-
-        // And next must be enabled
-        // TODO unified: Dramafinder Escape Hatch: // And next must be enabledassertThat(playwright.locator("#mise-week-next")).not().hasAttribute("disabled", "")
-        assertThat(playwright.locator("#mise-week-next")).not().hasAttribute("disabled", "");
-        // TODO unified: Dramafinder Escape Hatch: assertThat(playwright.locator("#mise-week-next")).not().hasAttribute("aria-disabled", "true")
-        assertThat(playwright.locator("#mise-week-next")).not().hasAttribute("aria-disabled", "true");
+        // then
+        assertThat(previousWeekButton(page)).isDisabled();
+        assertThat(nextWeekButton(page)).isEnabled();
     }
 
     /**
      * AC: After navigating to the oldest plan, clicking next returns to the middle plan.
      */
     @Test
-    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    @DisplayName("From the oldest week, next week goes forward again")
     void nextButtonNavigatesForwardAfterReachingOldest(UnifiedPage page) {
-        Page playwright = page.unwrap(Page.class);
+        // given
         page.navigate("/plan");
-        // Navigate to oldest — click prev twice, waiting for each navigation
-        // TODO unified: Dramafinder Escape Hatch: // Navigate to oldest — click prev twice, waiting for each navigationplaywright.locator("#mise-week-prev").click()
-        playwright.locator("#mise-week-prev").click();
-        // TODO unified: Dramafinder Escape Hatch: assertThat(playwright.locator("#mise-week-badge")).containsText("Week of " + middlePlan.getWeekStartDate().format(WEEK_FMT))
-        assertThat(playwright.locator("#mise-week-badge"))
-                .containsText("Week of " + middlePlan.getWeekStartDate().format(WEEK_FMT));
-        // TODO unified: Dramafinder Escape Hatch: playwright.locator("#mise-week-prev").click()
-        playwright.locator("#mise-week-prev").click();
-        // TODO unified: Dramafinder Escape Hatch: assertThat(playwright.locator("#mise-week-badge")).containsText("Week of " + oldestPlan.getWeekStartDate().format(WEEK_FMT))
-        assertThat(playwright.locator("#mise-week-badge"))
-                .containsText("Week of " + oldestPlan.getWeekStartDate().format(WEEK_FMT));
+        goBackTwoWeeks(page);
 
-        // Navigate forward once
-        // TODO unified: Dramafinder Escape Hatch: // Navigate forward onceplaywright.locator("#mise-week-next").click()
-        playwright.locator("#mise-week-next").click();
+        // when
+        nextWeekButton(page).click();
 
-        String expected = "Week of " + middlePlan.getWeekStartDate().format(WEEK_FMT);
-        // TODO unified: Dramafinder Escape Hatch: assertThat(playwright.locator("#mise-week-badge")).containsText(expected)
-        assertThat(playwright.locator("#mise-week-badge")).containsText(expected);
+        // then
+        assertThat(weekBadge(page)).hasTextContaining(weekLabel(middlePlan));
     }
 
     /**
      * AC: The ?week= param survives a page reload — the badge still shows the same week.
      */
     @Test
-    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    @DisplayName("The chosen week is kept after a reload")
     void weekParamPersistsAcrossReload(UnifiedPage page) {
-        Page playwright = page.unwrap(Page.class);
+        // given
         page.navigate("/plan");
-        // Navigate to the middle plan
-        // TODO unified: Dramafinder Escape Hatch: // Navigate to the middle planplaywright.locator("#mise-week-prev").click()
-        playwright.locator("#mise-week-prev").click();
-        String expectedBadge = "Week of " + middlePlan.getWeekStartDate().format(WEEK_FMT);
-        // TODO unified: Dramafinder Escape Hatch: assertThat(playwright.locator("#mise-week-badge")).containsText(expectedBadge)
-        assertThat(playwright.locator("#mise-week-badge")).containsText(expectedBadge);
+        previousWeekButton(page).click();
+        assertThat(weekBadge(page)).hasTextContaining(weekLabel(middlePlan));
+        assertThat(page).hasQueryParameter("week", middlePlan.getWeekStartDate().toString());
 
-        // Verify the URL contains the week param before reloading
-        // TODO unified: Dramafinder Escape Hatch: playwright.url()
-        Assertions.assertThat(playwright.url()).contains(middlePlan.getWeekStartDate().toString());
+        // when
+        page.reload();
 
-        // Reload — the URL still has ?week=<middle-monday>
-        // TODO unified: Dramafinder Escape Hatch: // Reload — the URL still has ?week=<middle-monday>playwright.reload()
-        playwright.reload();
-
-        // TODO unified: Dramafinder Escape Hatch: assertThat(playwright.locator("#mise-week-badge")).containsText(expectedBadge)
-        assertThat(playwright.locator("#mise-week-badge")).containsText(expectedBadge);
+        // then
+        assertThat(weekBadge(page)).hasTextContaining(weekLabel(middlePlan));
     }
 
     /**
      * AC: Clicking the week badge opens the DatePicker overlay.
      */
     @Test
-    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    @DisplayName("Clicking the week badge opens the week picker")
     void clickingBadgeOpensDatePickerOverlay(UnifiedPage page) {
-        Page playwright = page.unwrap(Page.class);
         page.navigate("/plan");
-        // TODO unified: Dramafinder Escape Hatch: playwright.locator("#mise-week-badge").click()
-        playwright.locator("#mise-week-badge").click();
-
-        // The DatePicker overlay element must appear in the DOM and be visible
-        // TODO unified: Dramafinder Escape Hatch: // The DatePicker overlay element must appear in the DOM and be visibleassertThat(playwright.locator("vaadin-date-picker-overlay")).isVisible()
-        assertThat(playwright.locator("vaadin-date-picker-overlay")).isVisible();
+        // a Span with a click listener: UnifiedSpan has no click() (findings F23)
+        weekBadge(page).element().click();
+        assertThat(weekPicker(page)).hasProperty("opened", true);
     }
 
     /**
      * AC: Picking a Wednesday from the DatePicker snaps to that week's Monday (BR-07).
      * The badge must show the Monday after picking a Wednesday.
-     *
-     * <p>The DatePicker text input is hidden via CSS (only the overlay is shown). We set
-     * its value programmatically via JavaScript — Vaadin's Polymer property setter triggers
-     * the server-side ValueChangeEvent just as a user selection would.
      */
     @Test
+    @DisplayName("Picking a Wednesday shows the week starting that Monday")
     @RequiresTestingTool(TestingTool.PLAYWRIGHT)
     void pickingWednesdaySnapsToMonday(UnifiedPage page) {
+        // Escape Hatch kept: the picker's input is hidden by CSS and a user picks a day in the calendar
+        // overlay, which the Unified API can't drive (UnifiedDatePicker.setValue refuses a hidden field in a
+        // browser, rightly). Set the value as the overlay does, through the web component's property.
         Page playwright = page.unwrap(Page.class);
+        // given
         page.navigate("/plan");
-        // The Wednesday that belongs to the oldest plan's week
-        LocalDate wednesday = oldestPlan.getWeekStartDate()
-                .with(TemporalAdjusters.nextOrSame(DayOfWeek.WEDNESDAY));
+        LocalDate wednesday = oldestPlan.getWeekStartDate().with(TemporalAdjusters.nextOrSame(DayOfWeek.WEDNESDAY));
+        weekBadge(page).element().click();
+        assertThat(weekPicker(page)).hasProperty("opened", true);
 
-        // Open the picker via the badge
-        // TODO unified: Dramafinder Escape Hatch: // Open the picker via the badgeplaywright.locator("#mise-week-badge").click()
-        playwright.locator("#mise-week-badge").click();
-        // TODO unified: Dramafinder Escape Hatch: assertThat(playwright.locator("vaadin-date-picker-overlay")).isVisible()
-        assertThat(playwright.locator("vaadin-date-picker-overlay")).isVisible();
+        // when
+        playwright.locator("#mise-week-datepicker").evaluate("(picker, value) => { picker.value = value; }",
+                wednesday.toString());
 
-        // Set the picker value programmatically: arg is passed as the second parameter to the
-        // arrow function — Playwright's evaluate(expression, arg) pattern.
-        String isoWednesday = wednesday.toString();
-        // TODO unified: Dramafinder Escape Hatch: playwright.locator("#mise-week-datepicker").evaluate("(picker, value) => { picker.value = value; }",isoWednesday)
-        playwright.locator("#mise-week-datepicker").evaluate(
-                "(picker, value) => { picker.value = value; }",
-                isoWednesday);
-
-        // After snap, the badge must show the Monday of that week (not the Wednesday)
-        LocalDate expectedMonday = oldestPlan.getWeekStartDate();
-        String expectedBadge = "Week of " + expectedMonday.format(WEEK_FMT);
-        // TODO unified: Dramafinder Escape Hatch: assertThat(playwright.locator("#mise-week-badge")).containsText(expectedBadge)
-        assertThat(playwright.locator("#mise-week-badge")).containsText(expectedBadge);
+        // then: the badge shows the Monday of that week, not the Wednesday
+        assertThat(weekBadge(page)).hasTextContaining(weekLabel(oldestPlan));
     }
 
     /**
      * AC: Picking the same week the user is currently viewing is a no-op — URL doesn't change.
      */
     @Test
+    @DisplayName("Picking the week already shown changes nothing")
     @RequiresTestingTool(TestingTool.PLAYWRIGHT)
     void pickingSameWeekIsNoOp(UnifiedPage page) {
+        // Escape Hatch kept: the picker's input is hidden by CSS and a user picks a day in the calendar
+        // overlay, which the Unified API can't drive (UnifiedDatePicker.setValue refuses a hidden field in a
+        // browser, rightly). Set the value as the overlay does, through the web component's property.
         Page playwright = page.unwrap(Page.class);
+        // given
         page.navigate("/plan");
-        // Navigate to middle plan first — wait for navigation
-        // TODO unified: Dramafinder Escape Hatch: // Navigate to middle plan first — wait for navigationplaywright.locator("#mise-week-prev").click()
-        playwright.locator("#mise-week-prev").click();
-        // TODO unified: Dramafinder Escape Hatch: assertThat(playwright.locator("#mise-week-badge")).containsText("Week of " + middlePlan.getWeekStartDate().format(WEEK_FMT))
-        assertThat(playwright.locator("#mise-week-badge"))
-                .containsText("Week of " + middlePlan.getWeekStartDate().format(WEEK_FMT));
-        // TODO unified: Dramafinder Escape Hatch: playwright.url()
-        String urlBefore = playwright.url();
+        previousWeekButton(page).click();
+        assertThat(weekBadge(page)).hasTextContaining(weekLabel(middlePlan));
+        weekBadge(page).element().click();
+        assertThat(weekPicker(page)).hasProperty("opened", true);
 
-        // Open picker and set the same Monday that is already being viewed
-        // TODO unified: Dramafinder Escape Hatch: // Open picker and set the same Monday that is already being viewedplaywright.locator("#mise-week-badge").click()
-        playwright.locator("#mise-week-badge").click();
-        // TODO unified: Dramafinder Escape Hatch: assertThat(playwright.locator("vaadin-date-picker-overlay")).isVisible()
-        assertThat(playwright.locator("vaadin-date-picker-overlay")).isVisible();
+        // when
+        playwright.locator("#mise-week-datepicker").evaluate("(picker, value) => { picker.value = value; }",
+                middlePlan.getWeekStartDate().toString());
 
-        String sameMonday = middlePlan.getWeekStartDate().toString();
-        // TODO unified: Dramafinder Escape Hatch: playwright.locator("#mise-week-datepicker").evaluate("(picker, value) => { picker.value = value; }",sameMonday)
-        playwright.locator("#mise-week-datepicker").evaluate(
-                "(picker, value) => { picker.value = value; }",
-                sameMonday);
-
-        // Wait briefly for any potential navigation, then assert URL unchanged
-        // TODO unified: Dramafinder Escape Hatch: // Wait briefly for any potential navigation, then assert URL unchangedplaywright.waitForTimeout(500)
-        playwright.waitForTimeout(500);
-        // TODO unified: Dramafinder Escape Hatch: playwright.url()
-        String urlAfter = playwright.url();
-        Assertions.assertThat(urlAfter).isEqualTo(urlBefore);
+        // then
+        assertThat(page).hasPath("/plan");
+        assertThat(page).hasQueryParameter("week", middlePlan.getWeekStartDate().toString());
+        assertThat(weekBadge(page)).hasTextContaining(weekLabel(middlePlan));
     }
 
     /**
      * AC: Tab links preserve the ?week= param when switching between Plan and Shopping.
-     * After clicking prev on /plan (landing on /plan?week=X), clicking the Shopping tab
-     * must navigate to /shopping?week=X.
      */
     @Test
-    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    @DisplayName("Switching to the shopping tab keeps the chosen week")
     void tabLinkPreservesWeekParam(UnifiedPage page) {
-        Page playwright = page.unwrap(Page.class);
+        // given: the middle (historical) week
         page.navigate("/plan");
-        // Navigate to the middle (historical) plan — wait for navigation to complete
-        // TODO unified: Dramafinder Escape Hatch: // Navigate to the middle (historical) plan — wait for navigation to completeplaywright.locator("#mise-week-prev").click()
-        playwright.locator("#mise-week-prev").click();
+        previousWeekButton(page).click();
         String weekStr = middlePlan.getWeekStartDate().toString();
-        // TODO unified: Dramafinder Escape Hatch: assertThat(playwright.locator("#mise-week-badge")).containsText("Week of " + middlePlan.getWeekStartDate().format(WEEK_FMT))
-        assertThat(playwright.locator("#mise-week-badge"))
-                .containsText("Week of " + middlePlan.getWeekStartDate().format(WEEK_FMT));
-        // Confirm we have a ?week= in URL
-        // TODO unified: Dramafinder Escape Hatch: playwright.url()
-        Assertions.assertThat(playwright.url()).contains("week=" + weekStr);
+        assertThat(page).hasQueryParameter("week", weekStr);
 
-        // Click the Shopping tab — use the mise-tab class + "Shopping" text to scope
-        // away from any accidental matches in page content
-        // TODO unified: Dramafinder Escape Hatch: // Click the Shopping tab — use the mise-tab class + "Shopping" text to scope// away from any accidental matches in page contentplaywright.locator(".mise-tab").filter(new com.microsoft.playwright.Locator.FilterOptions().setHasText("Shopping")).click()
-        playwright.locator(".mise-tab").filter(new com.microsoft.playwright.Locator.FilterOptions()
-                .setHasText("Shopping")).click();
+        // when
+        // the tab is a Div with a click listener: UnifiedDiv has no click() (findings F23)
+        page.find(UnifiedDiv.class).withClassName("mise-tab").withText("Shopping").element().click();
 
-        // Wait for /shopping to load — title changes
-        // TODO unified: Dramafinder Escape Hatch: // Wait for /shopping to load — title changesassertThat(playwright).hasTitle("Mise — Shopping")
-        assertThat(playwright).hasTitle("Mise — Shopping");
-
-        // The URL must be /shopping?week=<middle-monday>
-        // TODO unified: Dramafinder Escape Hatch: playwright.url()
-        String url = playwright.url();
-        Assertions.assertThat(url).contains("/shopping");
-        Assertions.assertThat(url).contains("week=" + weekStr);
+        // then
+        assertThat(page).hasPath("/shopping");
+        assertThat(page).hasQueryParameter("week", weekStr);
     }
 
     /**
-     * AC: Navigating directly to /plan?week=<old-monday> renders that older plan's meals
-     * in the PlanView (7 meal rows belonging to oldestPlan).
+     * AC: Navigating directly to /plan?week=<old-monday> renders that older plan's meals.
      */
     @Test
-    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    @DisplayName("Opening an older week by URL shows its seven meals")
     void directWeekUrlRendersOlderPlanMeals(UnifiedPage page) {
-        Page playwright = page.unwrap(Page.class);
-        page.navigate("/plan");
-        String oldMonday = oldestPlan.getWeekStartDate().toString();
-        // TODO unified: Dramafinder Escape Hatch: playwright.navigate(baseUrl() + "/plan?week=" + oldMonday)
-        playwright.navigate(baseUrl() + "/plan?week=" + oldMonday);
-
-        // Badge must show the oldest plan's Monday
-        String expected = "Week of " + oldestPlan.getWeekStartDate().format(WEEK_FMT);
-        // TODO unified: Dramafinder Escape Hatch: assertThat(playwright.locator("#mise-week-badge")).containsText(expected)
-        assertThat(playwright.locator("#mise-week-badge")).containsText(expected);
-
-        // The meal grid must still render 7 rows (one per day)
-        // TODO unified: Dramafinder Escape Hatch: // The meal grid must still render 7 rows (one per day)assertThat(playwright.getByTestId("meal-row")).hasCount(7)
-        assertThat(playwright.getByTestId("meal-row")).hasCount(7);
+        page.navigate("/plan?week=" + oldestPlan.getWeekStartDate());
+        assertThat(weekBadge(page)).hasTextContaining(weekLabel(oldestPlan));
+        assertThat(page.find(UnifiedDiv.class).withTestId("meal-row")).hasCount(7);
     }
 
     /**
      * AC: Clicking the brand wordmark navigates to /plan (active week, no ?week= param).
      */
     @Test
-    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    @DisplayName("The Mise logo goes back to the active week")
     void brandWordmarkNavigatesToActiveWeek(UnifiedPage page) {
-        Page playwright = page.unwrap(Page.class);
-        // Go to oldest plan first via direct URL
-        // TODO unified: Dramafinder Escape Hatch: // Go to oldest plan first via direct URLplaywright.navigate(baseUrl() + "/plan?week=" + oldestPlan.getWeekStartDate())
-        playwright.navigate(baseUrl() + "/plan?week=" + oldestPlan.getWeekStartDate());
-        // TODO unified: Dramafinder Escape Hatch: assertThat(playwright.locator("#mise-week-badge")).containsText("Week of " + oldestPlan.getWeekStartDate().format(WEEK_FMT))
-        assertThat(playwright.locator("#mise-week-badge"))
-                .containsText("Week of " + oldestPlan.getWeekStartDate().format(WEEK_FMT));
+        // given: the oldest week
+        page.navigate("/plan?week=" + oldestPlan.getWeekStartDate());
+        assertThat(weekBadge(page)).hasTextContaining(weekLabel(oldestPlan));
 
-        // Click the brand/home wordmark
-        // TODO unified: Dramafinder Escape Hatch: // Click the brand/home wordmarkplaywright.locator("[data-testid='app-header-wordmark']").click()
-        playwright.locator("[data-testid='app-header-wordmark']").click();
+        // when
+        // the brand is a Div with a click listener: UnifiedDiv has no click() (findings F23)
+        page.find(UnifiedDiv.class).withTestId("app-header-wordmark").element().click();
 
-        // Must navigate to active week — badge shows active plan's Monday
-        String expected = "Week of " + activePlan.getWeekStartDate().format(WEEK_FMT);
-        // TODO unified: Dramafinder Escape Hatch: assertThat(playwright.locator("#mise-week-badge")).containsText(expected)
-        assertThat(playwright.locator("#mise-week-badge")).containsText(expected);
+        // then: the active week, with a clean URL
+        assertThat(weekBadge(page)).hasTextContaining(weekLabel(activePlan));
+        assertThat(page).hasQueryParameter("week", null);
+    }
 
-        // URL must no longer contain a ?week= param (active plan uses clean URL)
-        // TODO unified: Dramafinder Escape Hatch: playwright.url()
-        Assertions.assertThat(playwright.url()).doesNotContain("week=");
+    private static UnifiedButton previousWeekButton(UnifiedPage page) {
+        return page.find(UnifiedButton.class).withAccessibleName("Previous week");
+    }
+
+    private static UnifiedButton nextWeekButton(UnifiedPage page) {
+        return page.find(UnifiedButton.class).withAccessibleName("Next week");
+    }
+
+    private static UnifiedSpan weekBadge(UnifiedPage page) {
+        return page.find(UnifiedSpan.class).withId("mise-week-badge");
+    }
+
+    private static UnifiedDatePicker weekPicker(UnifiedPage page) {
+        return page.find(UnifiedDatePicker.class).withId("mise-week-datepicker");
+    }
+
+    private static String weekLabel(Plan plan) {
+        return "Week of " + plan.getWeekStartDate().format(WEEK_FMT);
+    }
+
+    private void goBackTwoWeeks(UnifiedPage page) {
+        page.step("Go back to the oldest week", () -> {
+            previousWeekButton(page).click();
+            assertThat(weekBadge(page)).hasTextContaining(weekLabel(middlePlan));
+            previousWeekButton(page).click();
+            assertThat(weekBadge(page)).hasTextContaining(weekLabel(oldestPlan));
+        });
     }
 }

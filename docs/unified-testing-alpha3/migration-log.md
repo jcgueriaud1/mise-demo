@@ -385,3 +385,18 @@ How the executions are set up:
 - **The store-mode checks changed meaning.** "The active class" via `hasClass(Pattern)` became `assertThat(button.withClassName("active")).exists()` / `doesNotExist()`. The mobile store badge, which CSS hides on desktop, is now checked for *existence* only. Its visibility is a CSS concern the old test also didn't assert.
 - Kept: the page-title Escape Hatch (F21).
 - **Result:** Playwright 12/12, Browserless 11/11 (title test skipped).
+
+### 7h: WeekNavigationIT
+
+- 55 of 57 markers resolved, so 11 of the 13 tests run everywhere.
+- **Lookups and checks:**
+  - The chevrons are found by accessible name ("Previous week" / "Next week") and checked with `isEnabled()` / `isDisabled()`. The old test checked `disabled` / `aria-disabled` attributes.
+  - The URL checks (`playwright.url()` contains `week=…`) became `assertThat(page).hasQueryParameter("week", ..)` / `hasPath("/shopping")`, and "no `?week=`" became `hasQueryParameter("week", null)`.
+  - "The picker overlay is visible" became `assertThat(datePicker).hasProperty("opened", true)`. The picker is opened server-side by `weekPicker.open()`.
+- **A small User Task:** `goBackTwoWeeks(page)` is a `page.step(..)` around two clicks and their badge checks.
+- **Clickable `Div`/`Span`s** (the week badge, the tabs and the brand wordmark, all with server click listeners) need `wrapper.element().click()`, because `UnifiedDiv` / `UnifiedSpan` have no `click()` (F23).
+- **Kept, with a reason:** the two date-picker tests. The picker's input is hidden by CSS, and a user picks in the overlay calendar.
+  - Playwright correctly refused `UnifiedDatePicker.setValue(..)` with `Found 1, but hidden`.
+  - Browserless, which can't see CSS, happily typed into it and passed (F24).
+  - They stay `@RequiresTestingTool(PLAYWRIGHT)` and set the value through the web component's property, as before.
+- **Result:** Playwright 13/13, Browserless 11/11 (2 skipped).
