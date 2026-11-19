@@ -1,6 +1,6 @@
 # Findings: Unified Testing 0.1.0-alpha3 in Mise
 
-Issues found while preparing the migration of Mise's Browserless and DramaFinder tests to `org.vaadin.addons:unified-test-*` 0.1.0-alpha3. The process is in [`migration-log.md`](migration-log.md). Each entry says how sure it is:
+Issues found while preparing and running the migration of Mise's Browserless and DramaFinder tests to `org.vaadin.addons:unified-test-*` 0.1.0-alpha3. The process is in [`migration-log.md`](migration-log.md). Each entry says how sure it is:
 
 - **Verified:** reproduced or checked against the artifact or the docs.
 - **Predicted:** read from the docs or the recipe code, not yet run.
@@ -179,3 +179,32 @@ A `Div` or `Span` with a server-side click listener (`ClickNotifier`) is a commo
 - **Browserless:** passes, because server-side the field is visible.
 
 The "Running on the other Testing Tools" section of the migration guide mentions that "Visible" means `setVisible(true)` on the server. This is the practical consequence: a test can be green on Browserless and red on Playwright for a real reason. Running both tools in CI (step 6) is what caught it.
+
+## Summary
+
+| # | Area | Finding | Severity for an adopter |
+|---|---|---|---|
+| F1 | docs | migration guides at the alpha3 tag give alpha2 recipe coordinates | high, they run the wrong recipes |
+| F2 | docs | stale "Not published yet" warning | low |
+| F3 | docs | site documents `main`, with no versioned docs | medium |
+| F4 | docs / build | the Vaadin 25.3 requirement is only in the release notes, and nothing checks it | medium |
+| F5 | BOM | silently re-pins browserless-test and DramaFinder (1.x → 2.x) | medium |
+| F6 | recipe | project base class: every subclass is skipped, with no marker | **high**, 1/12 migrated on the first run |
+| F7 | API | no MessageInput / MessageList Wrappers | medium for AI apps |
+| F8 | recipe | raw `locator("#id")` isn't converted | medium, most of the effort |
+| F9 | skill | `resolve-migration-markers` can only be started by the user | low |
+| F10 | recipe | drops the copied base class's `@ActiveProfiles` / `@Import` | **high**, the test silently runs against the wrong environment |
+| F11 | recipe | `addAgentSkill: true` doesn't write the skill | medium |
+| F12 | recipe | `IgnoreToDisabled` doesn't exist (unpinned plugin) | low |
+| F13 | spring | `@UnifiedSpringBootTest` fails without Spring Security | **blocker**, every test fails |
+| F14 | recipe | keeps a stale hard-coded `browserless-test-spring` version | medium |
+| F15 | recipe | the skill pointer goes to `AGENTS.md`, which Claude Code doesn't read | low |
+| F16 | recipe | `getUrl()` in a test body blocks the whole class | high |
+| F17 | recipe | no report of skipped classes or their reasons | medium |
+| F18 | docs / config | running both tools in one build overwrites the evidence | medium |
+| F19 | recipe | markers swallow the preceding comment | low |
+| F20 | positive | Browserless found a real app bug the browser hides | — |
+| F21 | API | no page-title assertion | low |
+| F22 | API | no grid column-header assertion | medium |
+| F23 | API | `UnifiedDiv` / `UnifiedSpan` have no `click()` | medium |
+| F24 | behaviour | Browserless passes CSS-hidden inputs (documented, worth a louder note) | low |

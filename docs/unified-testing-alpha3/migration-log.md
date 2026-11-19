@@ -18,7 +18,7 @@ Issues found along the way: [`findings.md`](findings.md)
 | 7 | Resolve the Migration Markers | **Done** except 2 live-LLM ITs (9 markers open), sub-steps 7a–7i |
 | 8 | Add the `UnifiedStyleTest` (ArchUnit style rules) | **Done**: green, live-LLM ITs excluded |
 | 9 | Update CLAUDE.md, skills, memory, spec | **Done**, except `spec/architecture.md` (needs approval; text proposed below) |
-| 10 | Full verification across all three layers | Not started |
+| 10 | Full verification across all three layers | **Done**: unit 194 ✓, Playwright 74 ✓, Browserless 66 ✓ + 8 skipped; AIIT not run (no LLM endpoint) |
 
 Convention: **one commit per step**, message `unified-testing: step N, <what>`. Each commit appends its entry below and any new issue to `findings.md`.
 
@@ -458,3 +458,42 @@ How the executions are set up:
 - Line 25: the Spring AI pin list gains "25.3.x → 2.0.1", and "check `vaadin-ai-components-flow`'s POM" becomes "check `vaadin-ai-core-flow`'s POM".
 - Lines 39–41, test stack, replaced by:
   > - **Unified Testing Tool** (`org.vaadin.addons:unified-test-*`, test scope, versions from `unified-test-bom`) — UI tests are Unified UI Tests: one source, run on **Browserless** (in-JVM, default) and **Playwright** (real headless Chromium). `*IT.java` under `src/test/java/com/example/mise/it/` are `@UnifiedSpringBootTest` + `@ActiveProfiles("it")` + `@Import(TestAiConfig.class)` and take a `UnifiedPage`; `-Pit` runs them on both tools; tests that need a real browser declare `@RequiresTestingTool(PLAYWRIGHT)`. In-memory H2 via `application-it.properties`; accidental LLM calls fail fast (endpoint `http://127.0.0.1:1`). Style enforced by `UnifiedStyleTest` (unified-test-archunit).
+
+---
+
+## Step 10: Full verification (2026-11-19)
+
+`rewrite.yml` is removed, since the recipes are done. Then a clean build, `./mvnw clean -Pit verify`:
+
+| Phase | Result |
+|---|---|
+| surefire (unit + Browserless + `UnifiedStyleTest`) | **194 run, 0 failed** |
+| failsafe `it-playwright` | **74 run, 0 failed, 0 skipped**. `summary.md`: 72 Unified UI Tests passed; the other 2 are repository-only tests without a `UnifiedPage` |
+| failsafe `it-browserless` | **74 run, 0 failed, 8 skipped**. `summary.md`: 64 passed, 8 skipped (the `@RequiresTestingTool(PLAYWRIGHT)` tests) |
+| `BUILD SUCCESS` | 1 min 06 s total |
+
+Not run: `./mvnw -Pai-it verify` and `-Pmanual-verify`, because this machine has no LLM endpoint. Run them before merging.
+
+### Before → after
+
+| | Before (dev-main) | After (this branch) |
+|---|---|---|
+| Vaadin / Spring AI / DramaFinder | 25.2.6 / 2.0.1 / 1.2.0 | 25.3.5 / 2.0.1 / 2.2.0 (transitive) |
+| UI test API | DramaFinder + raw Playwright, `SpringBrowserlessTest` | Unified API (`unified-test-*` 0.1.0-alpha3) |
+| UI tests runnable on Browserless | 1 | **66** (+8 that need a real browser) |
+| UI tests runnable on Playwright | 74 | 74 + `PlanViewBrowserlessTest` on request |
+| Raw `locator(..)` / `evaluate` / `waitForFunction` in ITs | ~71 / 11 / 11 | only in the 6 kept Escape Hatch tests + the 2 open live-LLM ITs |
+| Reports | JUnit XML + a screenshot on failure | + User Steps per test, `summary.md`, `report.html`, Playwright trace on failure |
+
+### Open items
+
+1. **The live-LLM ITs.** `ManualExamplesReportsIT` and `ManualExamplesStopIT` still have 9 Migration Markers. Resolve them with a live endpoint and `-Pmanual-verify`, then remove their exclusion from `UnifiedStyleTest`.
+2. **`spec/architecture.md`.** The proposed edits are in step 9 and need your approval.
+3. **The AIIT layer.** Run `./mvnw -Pai-it verify` against the live model. The Vaadin 25.3 bump doesn't touch the ChatClient path, but it hasn't been run.
+4. **The `spring-security-core` workaround** (F13) can come out once unified-test-spring fixes the condition.
+5. **Upstream.** The library findings in [`findings.md`](findings.md) are ready to file as issues on parttio/unified-testing-tool.
+
+### Commits
+
+One commit per step on `unified-testing-alpha3` (`git log --oneline dev-main..`):
+`step 0` plan and log · findings · `step 1` Vaadin 25.3.5 · `step 2` DramaFinder 2.2.0 · `step 4` recipes · `step 5` 12/12 ITs migrated · `step 6` two-tool `-Pit` · `step 7a`–`7i` markers per class · `step 8` style rules · `step 9` docs · `step 10` verification.

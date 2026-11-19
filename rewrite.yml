@@ -1,8 +1,0 @@
-type: specs.openrewrite.org/v1beta/recipe
-name: com.example.mise.MigrateToUnified
-displayName: Migrate Mise UI tests to the Unified API
-recipeList:
-  - org.vaadin.addons.unified.rewrite.MigrateBrowserlessToUnified
-  - org.vaadin.addons.unified.rewrite.MigrateDramafinderToUnified:
-      addBrowserless: true
-      addAgentSkill: true
