@@ -1,5 +1,6 @@
 package com.example.mise.it;
 
+import com.example.mise.ui.reports.ReportsView;
 import com.example.mise.ai.MiseDatabaseProvider;
 import com.example.mise.capabilities.recipes.RecipeCatalog;
 import com.example.mise.domain.conversation.ConversationMessageRepository;
@@ -122,7 +123,7 @@ class ManualExamplesReportsIT {
     @DisplayName("Asking to rank the leaderboard by kcal per euro reshapes it (live model)")
     @RequiresTestingTool(TestingTool.PLAYWRIGHT)
     void leaderboardRankByKcalPerEuro_reshapesViaChat(UnifiedPage page) throws InterruptedException {
-        page.navigate("/reports");
+        page.navigate(ReportsView.class);
         Assertions.assertThat(pref("leaderboard"))
                 .as("Precondition: the leaderboard must start with no saved ViewPreference").isFalse();
 
@@ -144,7 +145,7 @@ class ManualExamplesReportsIT {
     @DisplayName("Asking for a weekly meal-type pivot reshapes the leaderboard (live model)")
     @RequiresTestingTool(TestingTool.PLAYWRIGHT)
     void leaderboardWeeklyMealTypePivot_reshapesViaChat(UnifiedPage page) throws InterruptedException {
-        page.navigate("/reports");
+        page.navigate(ReportsView.class);
         Assertions.assertThat(pref("leaderboard"))
                 .as("Precondition: the leaderboard must start with no saved ViewPreference").isFalse();
 
@@ -189,7 +190,7 @@ class ManualExamplesReportsIT {
     @DisplayName("Asking for a vegetarian-by-month chart reshapes a chart (live model)")
     @RequiresTestingTool(TestingTool.PLAYWRIGHT)
     void chartVegetarianByMonth_reshapesViaChat(UnifiedPage page) throws InterruptedException {
-        page.navigate("/reports");
+        page.navigate(ReportsView.class);
         Assertions.assertThat(pref("trendChart") || pref("categoryChart"))
                 .as("Precondition: charts must start with no saved ViewPreference").isFalse();
 

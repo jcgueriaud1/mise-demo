@@ -497,3 +497,11 @@ Not run: `./mvnw -Pai-it verify` and `-Pmanual-verify`, because this machine has
 
 One commit per step on `unified-testing-alpha3` (`git log --oneline dev-main..`):
 `step 0` plan and log · findings · `step 1` Vaadin 25.3.5 · `step 2` DramaFinder 2.2.0 · `step 4` recipes · `step 5` 12/12 ITs migrated · `step 6` two-tool `-Pit` · `step 7a`–`7i` markers per class · `step 8` style rules · `step 9` docs · `step 10` verification.
+
+---
+
+## Follow-up: navigate by view class (2026-11-19)
+
+The recipe had written `page.navigate("/plan")` from each class's `getView()` string. 72 navigations now use the view class (`PlanView`, `ReportsView`, `ShoppingView`, `OnboardingView`, `HomeView`), which is the canonical form in `write-unified-ui-tests`. A renamed route now breaks at compile time, and the User Steps read `open Plan`. The 4 `/plan?week=…` navigations stay paths, each with a comment, because `UnifiedPage` has no Class + query-parameters overload. That is filed upstream as F25 / [#370](https://github.com/parttio/unified-testing-tool/issues/370).
+
+**Result** (`./mvnw -Pit verify`): unit 194 ✓, Playwright 74/74 ✓, Browserless 66 ✓ + 8 skipped. The two ManualExamples ITs were changed the same way. They compile but weren't run, since they need a live LLM.

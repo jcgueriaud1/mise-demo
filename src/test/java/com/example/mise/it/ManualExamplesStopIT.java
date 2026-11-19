@@ -1,5 +1,6 @@
 package com.example.mise.it;
 
+import com.example.mise.ui.plan.PlanView;
 import com.example.mise.capabilities.recipes.RecipeCatalog;
 import com.example.mise.domain.conversation.ConversationMessageRepository;
 import com.example.mise.domain.household.Household;
@@ -97,7 +98,7 @@ class ManualExamplesStopIT {
     @RequiresTestingTool(TestingTool.PLAYWRIGHT)
     void stopCancelsAnInFlightTurn(UnifiedPage page) {
         Page playwright = page.unwrap(Page.class);
-        page.navigate("/plan");
+        page.navigate(PlanView.class);
         // TODO unified: Dramafinder Escape Hatch: playwright.getByTestId("chat-dock")
         var chatDock = playwright.getByTestId("chat-dock");
 

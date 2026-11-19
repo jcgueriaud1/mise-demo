@@ -1,5 +1,6 @@
 package com.example.mise.it;
 
+import com.example.mise.ui.reports.ReportsView;
 import com.example.mise.it.support.TestChatModel;
 import com.vaadin.testing.unified.RequiresTestingTool;
 import com.vaadin.testing.unified.TestingTool;
@@ -152,7 +153,7 @@ class ReportsViewIT {
     void hasPageTitle(UnifiedPage page) {
         // Escape Hatch kept: the Unified API has no page-title assertion
         Page playwright = page.unwrap(Page.class);
-        page.navigate("/reports");
+        page.navigate(ReportsView.class);
         com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat(playwright).hasTitle("Mise — Reports");
     }
 
@@ -162,7 +163,7 @@ class ReportsViewIT {
     @Test
     @DisplayName("The reports page opens")
     void reportsViewContainerIsVisible(UnifiedPage page) {
-        page.navigate("/reports");
+        page.navigate(ReportsView.class);
         assertThat(page.find(UnifiedContainer.class).withTestId("reports-view")).isVisible();
     }
 
@@ -174,7 +175,7 @@ class ReportsViewIT {
     @Test
     @DisplayName("The reports page shows the weekly cost trend")
     void costTrendWidgetIsVisible(UnifiedPage page) {
-        page.navigate("/reports");
+        page.navigate(ReportsView.class);
         assertThat(widget(page, "report-cost-trend")).isVisible();
     }
 
@@ -184,7 +185,7 @@ class ReportsViewIT {
     @Test
     @DisplayName("The reports page shows the cost by category")
     void categoryBreakdownWidgetIsVisible(UnifiedPage page) {
-        page.navigate("/reports");
+        page.navigate(ReportsView.class);
         assertThat(widget(page, "report-category-breakdown")).isVisible();
     }
 
@@ -194,7 +195,7 @@ class ReportsViewIT {
     @Test
     @DisplayName("The reports page shows the meal leaderboard")
     void leaderboardWidgetIsVisible(UnifiedPage page) {
-        page.navigate("/reports");
+        page.navigate(ReportsView.class);
         assertThat(leaderboard(page)).isVisible();
     }
 
@@ -205,7 +206,7 @@ class ReportsViewIT {
     @Test
     @DisplayName("The reports page shows all three widgets")
     void allThreeWidgetsRender(UnifiedPage page) {
-        page.navigate("/reports");
+        page.navigate(ReportsView.class);
         assertThat(widget(page, "report-cost-trend")).isVisible();
         assertThat(widget(page, "report-category-breakdown")).isVisible();
         assertThat(leaderboard(page)).isVisible();
@@ -220,7 +221,7 @@ class ReportsViewIT {
     @Test
     @DisplayName("With meal history, the leaderboard lists meals")
     void leaderboardGridHasRows(UnifiedPage page) {
-        page.navigate("/reports");
+        page.navigate(ReportsView.class);
         assertThat(leaderboard(page)).isVisible();
         assertThat(leaderboard(page).row(0)).exists();
     }
@@ -235,7 +236,7 @@ class ReportsViewIT {
     @DisplayName("A saved leaderboard customization is restored when the page is reloaded")
     void persistedLeaderboardQueryRestoresOnLoad(UnifiedPage page) {
         // given
-        page.navigate("/reports");
+        page.navigate(ReportsView.class);
         saveLeaderboardQuery("SELECT recipe_name AS \"Meal\", COUNT(*) AS \"Cooked times\" "
                 + "FROM meal_history GROUP BY recipe_name ORDER BY COUNT(*) DESC");
 
@@ -268,7 +269,7 @@ class ReportsViewIT {
     @DisplayName("A saved kcal-per-euro leaderboard column is restored when the page is reloaded")
     void leaderboardKcalPerEuroColumnRestoresOnLoad(UnifiedPage page) {
         // given
-        page.navigate("/reports");
+        page.navigate(ReportsView.class);
         saveLeaderboardQuery("SELECT recipe_name AS \"Meal\", COUNT(*) AS \"Times\", "
                 + "ROUND(AVG(CAST(kcal_per_serving AS DOUBLE)) "
                 + "/ AVG(CAST(est_cost_eur AS DOUBLE)), 1) AS \"kcal per euro\" "
@@ -295,7 +296,7 @@ class ReportsViewIT {
     @DisplayName("Resetting the leaderboard brings back its default columns")
     void resetWidgetRevertsToDefaultQuery(UnifiedPage page) {
         // given
-        page.navigate("/reports");
+        page.navigate(ReportsView.class);
         saveLeaderboardQuery("SELECT recipe_name AS \"Meal\", COUNT(*) AS \"Cooked times\" "
                 + "FROM meal_history GROUP BY recipe_name ORDER BY COUNT(*) DESC");
         page.reload();
@@ -319,7 +320,7 @@ class ReportsViewIT {
     @Test
     @DisplayName("Each customizable widget has a reset button")
     void resetButtonsArePresentForCustomisableWidgets(UnifiedPage page) {
-        page.navigate("/reports");
+        page.navigate(ReportsView.class);
         assertThat(page.find(UnifiedButton.class).withTestId("report-reset-trendChart")).exists();
         assertThat(page.find(UnifiedButton.class).withTestId("report-reset-categoryChart")).exists();
         assertThat(page.find(UnifiedButton.class).withTestId("report-reset-leaderboard")).exists();

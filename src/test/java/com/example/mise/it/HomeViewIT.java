@@ -1,5 +1,6 @@
 package com.example.mise.it;
 
+import com.example.mise.ui.HomeView;
 import com.example.mise.it.support.TestAiConfig;
 import com.microsoft.playwright.Page;
 import com.vaadin.testing.unified.RequiresTestingTool;
@@ -31,21 +32,21 @@ class HomeViewIT {
     void hasPageTitle(UnifiedPage page) {
         // Escape Hatch kept: the Unified API has no page-title assertion
         Page playwright = page.unwrap(Page.class);
-        page.navigate("/debug");
+        page.navigate(HomeView.class);
         com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat(playwright).hasTitle("Mise — Debug");
     }
 
     @Test
     @DisplayName("The debug page shows the build stage header")
     void rendersStageHeader(UnifiedPage page) {
-        page.navigate("/debug");
+        page.navigate(HomeView.class);
         assertThat(page.findComponent(H2.class).withText("Mise — prep build (stage 2)")).isVisible();
     }
 
     @Test
     @DisplayName("The debug page shows how many chat messages are stored")
     void showsStoredMessageCount(UnifiedPage page) {
-        page.navigate("/debug");
+        page.navigate(HomeView.class);
         assertThat(page.find(UnifiedSpan.class).withTextContaining("Stored messages:")).isVisible();
     }
 }

@@ -1,5 +1,6 @@
 package com.example.mise.it;
 
+import com.example.mise.ui.plan.PlanView;
 import com.example.mise.it.support.TestChatModel;
 import com.vaadin.testing.unified.RequiresTestingTool;
 import com.vaadin.testing.unified.TestingTool;
@@ -130,7 +131,7 @@ class ChatDockIT {
     void dockExpandsOnFocusAndCollapsesOnBlur(UnifiedPage page) {
         // Escape Hatch kept: computed CSS (max-height transition, preview display) on :focus-within needs a real browser
         Page playwright = page.unwrap(Page.class);
-        page.navigate("/plan");
+        page.navigate(PlanView.class);
         var chatDock = playwright.getByTestId("chat-dock");
         assertThat(chatDock).isVisible();
 
@@ -191,7 +192,7 @@ class ChatDockIT {
     void expandScrollsToLatestMessage(UnifiedPage page) {
         // Escape Hatch kept: scroll position after a CSS transition needs a real browser
         Page playwright = page.unwrap(Page.class);
-        page.navigate("/plan");
+        page.navigate(PlanView.class);
         var chatDock = playwright.getByTestId("chat-dock");
         MessageInputElement input = MessageInputElement.get(chatDock);
 
@@ -238,7 +239,7 @@ class ChatDockIT {
     @DisplayName("The chat dock shows it is working while the assistant answers")
     void aiWorkingClassToggledAroundSubmit(UnifiedPage page) throws Exception {
         // given: the assistant's answer is held back until the latch is released
-        page.navigate("/plan");
+        page.navigate(PlanView.class);
         CountDownLatch responseLatch = chatModel.pauseNextResponse();
         chatModel.queueReply("Sure — Thursday is Roasted Vegetable Pasta.");
         UnifiedContainer chatDock = page.find(UnifiedContainer.class).withTestId("chat-dock");

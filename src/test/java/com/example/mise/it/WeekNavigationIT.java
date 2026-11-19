@@ -1,5 +1,6 @@
 package com.example.mise.it;
 
+import com.example.mise.ui.plan.PlanView;
 import com.example.mise.it.support.TestChatModel;
 import com.vaadin.testing.unified.UnifiedPage;
 import com.vaadin.testing.unified.spring.UnifiedSpringBootTest;
@@ -189,7 +190,7 @@ class WeekNavigationIT {
     @DisplayName("On the active week, previous week is available and next week isn't")
     void activeWeekHasPrevEnabledAndNextDisabled(UnifiedPage page) {
         // when: default navigation lands on the active plan (/plan without ?week=)
-        page.navigate("/plan");
+        page.navigate(PlanView.class);
 
         // then: two earlier plans, none after the active one
         assertThat(previousWeekButton(page)).isVisible();
@@ -204,7 +205,7 @@ class WeekNavigationIT {
     @Test
     @DisplayName("The week badge shows the active week")
     void activeWeekBadgeShowsActivePlanMonday(UnifiedPage page) {
-        page.navigate("/plan");
+        page.navigate(PlanView.class);
         assertThat(weekBadge(page)).hasTextContaining(weekLabel(activePlan));
     }
 
@@ -214,7 +215,7 @@ class WeekNavigationIT {
     @Test
     @DisplayName("Going back one week shows the previous week")
     void clickPrevOnceShowsMiddleWeekInBadge(UnifiedPage page) {
-        page.navigate("/plan");
+        page.navigate(PlanView.class);
         previousWeekButton(page).click();
         assertThat(weekBadge(page)).hasTextContaining(weekLabel(middlePlan));
     }
@@ -225,7 +226,7 @@ class WeekNavigationIT {
     @Test
     @DisplayName("Going back one week puts that week in the URL")
     void weekParamAppearsInUrlAfterPrevClick(UnifiedPage page) {
-        page.navigate("/plan");
+        page.navigate(PlanView.class);
         previousWeekButton(page).click();
         assertThat(weekBadge(page)).hasTextContaining(weekLabel(middlePlan));
         assertThat(page).hasQueryParameter("week", middlePlan.getWeekStartDate().toString());
@@ -238,7 +239,7 @@ class WeekNavigationIT {
     @DisplayName("Going back to the oldest week disables previous and enables next")
     void clickPrevTwiceLandsOnOldestPlan(UnifiedPage page) {
         // given
-        page.navigate("/plan");
+        page.navigate(PlanView.class);
 
         // when
         goBackTwoWeeks(page);
@@ -255,7 +256,7 @@ class WeekNavigationIT {
     @DisplayName("From the oldest week, next week goes forward again")
     void nextButtonNavigatesForwardAfterReachingOldest(UnifiedPage page) {
         // given
-        page.navigate("/plan");
+        page.navigate(PlanView.class);
         goBackTwoWeeks(page);
 
         // when
@@ -272,7 +273,7 @@ class WeekNavigationIT {
     @DisplayName("The chosen week is kept after a reload")
     void weekParamPersistsAcrossReload(UnifiedPage page) {
         // given
-        page.navigate("/plan");
+        page.navigate(PlanView.class);
         previousWeekButton(page).click();
         assertThat(weekBadge(page)).hasTextContaining(weekLabel(middlePlan));
         assertThat(page).hasQueryParameter("week", middlePlan.getWeekStartDate().toString());
@@ -290,7 +291,7 @@ class WeekNavigationIT {
     @Test
     @DisplayName("Clicking the week badge opens the week picker")
     void clickingBadgeOpensDatePickerOverlay(UnifiedPage page) {
-        page.navigate("/plan");
+        page.navigate(PlanView.class);
         // a Span with a click listener: UnifiedSpan has no click() (findings F23)
         weekBadge(page).element().click();
         assertThat(weekPicker(page)).hasProperty("opened", true);
@@ -309,7 +310,7 @@ class WeekNavigationIT {
         // browser, rightly). Set the value as the overlay does, through the web component's property.
         Page playwright = page.unwrap(Page.class);
         // given
-        page.navigate("/plan");
+        page.navigate(PlanView.class);
         LocalDate wednesday = oldestPlan.getWeekStartDate().with(TemporalAdjusters.nextOrSame(DayOfWeek.WEDNESDAY));
         weekBadge(page).element().click();
         assertThat(weekPicker(page)).hasProperty("opened", true);
@@ -334,7 +335,7 @@ class WeekNavigationIT {
         // browser, rightly). Set the value as the overlay does, through the web component's property.
         Page playwright = page.unwrap(Page.class);
         // given
-        page.navigate("/plan");
+        page.navigate(PlanView.class);
         previousWeekButton(page).click();
         assertThat(weekBadge(page)).hasTextContaining(weekLabel(middlePlan));
         weekBadge(page).element().click();
@@ -357,7 +358,7 @@ class WeekNavigationIT {
     @DisplayName("Switching to the shopping tab keeps the chosen week")
     void tabLinkPreservesWeekParam(UnifiedPage page) {
         // given: the middle (historical) week
-        page.navigate("/plan");
+        page.navigate(PlanView.class);
         previousWeekButton(page).click();
         String weekStr = middlePlan.getWeekStartDate().toString();
         assertThat(page).hasQueryParameter("week", weekStr);
@@ -377,6 +378,7 @@ class WeekNavigationIT {
     @Test
     @DisplayName("Opening an older week by URL shows its seven meals")
     void directWeekUrlRendersOlderPlanMeals(UnifiedPage page) {
+        // a path: UnifiedPage.navigate has no Class + query-parameters overload
         page.navigate("/plan?week=" + oldestPlan.getWeekStartDate());
         assertThat(weekBadge(page)).hasTextContaining(weekLabel(oldestPlan));
         assertThat(page.find(UnifiedDiv.class).withTestId("meal-row")).hasCount(7);
@@ -389,6 +391,7 @@ class WeekNavigationIT {
     @DisplayName("The Mise logo goes back to the active week")
     void brandWordmarkNavigatesToActiveWeek(UnifiedPage page) {
         // given: the oldest week
+        // a path: UnifiedPage.navigate has no Class + query-parameters overload
         page.navigate("/plan?week=" + oldestPlan.getWeekStartDate());
         assertThat(weekBadge(page)).hasTextContaining(weekLabel(oldestPlan));
 

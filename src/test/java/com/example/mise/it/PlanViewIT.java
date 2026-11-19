@@ -1,5 +1,6 @@
 package com.example.mise.it;
 
+import com.example.mise.ui.plan.PlanView;
 import com.example.mise.it.support.TestChatModel;
 import com.vaadin.testing.unified.RequiresTestingTool;
 import com.vaadin.testing.unified.TestingTool;
@@ -140,7 +141,7 @@ class PlanViewIT {
     void hasPageTitle(UnifiedPage page) {
         // Escape Hatch kept: the Unified API has no page-title assertion
         Page playwright = page.unwrap(Page.class);
-        page.navigate("/plan");
+        page.navigate(PlanView.class);
         com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat(playwright).hasTitle("Mise — Plan");
     }
 
@@ -151,7 +152,7 @@ class PlanViewIT {
     @Test
     @DisplayName("The plan shows the weekly KPI strip with its four cards")
     void kpiStripRenders(UnifiedPage page) {
-        page.navigate("/plan");
+        page.navigate(PlanView.class);
         assertThat(byTestId(page, "kpi-strip")).isVisible();
         assertThat(byTestId(page, "kpi-card-weekly-cost")).isVisible();
         assertThat(byTestId(page, "kpi-card-avg-meal")).isVisible();
@@ -166,7 +167,7 @@ class PlanViewIT {
     @Test
     @DisplayName("The plan shows a meal for each of the seven days")
     void mealGridHasSevenRows(UnifiedPage page) {
-        page.navigate("/plan");
+        page.navigate(PlanView.class);
         assertThat(page.find(UnifiedDiv.class).withTestId("meal-row")).hasCount(7);
     }
 
@@ -176,7 +177,7 @@ class PlanViewIT {
     @Test
     @DisplayName("The plan shows the cost by category panel")
     void costByCategoryPanelRenders(UnifiedPage page) {
-        page.navigate("/plan");
+        page.navigate(PlanView.class);
         UnifiedContainer panel = byTestId(page, "cost-by-category-panel");
         assertThat(panel).isVisible();
         assertThat(panel.find(UnifiedParagraph.class).withText("COST BY CATEGORY")).isVisible();
@@ -190,7 +191,7 @@ class PlanViewIT {
     @DisplayName("Asking the assistant from the plan shows the question, the reply and its preview")
     void chatRoundTripWorksOnSharedDock(UnifiedPage page) {
         // given
-        page.navigate("/plan");
+        page.navigate(PlanView.class);
         chatModel.queueReply("Friday is creamy salmon pasta.");
 
         // when
@@ -209,7 +210,7 @@ class PlanViewIT {
     @DisplayName("A conversation started on the plan is saved as a PLAN conversation")
     void conversationPersistedWithPlanViewContext(UnifiedPage page) {
         // given
-        page.navigate("/plan");
+        page.navigate(PlanView.class);
         chatModel.queueReply("Friday is creamy salmon pasta.");
 
         // when
@@ -231,7 +232,7 @@ class PlanViewIT {
     @Test
     @DisplayName("Every day of the plan has a pin button")
     void pinButtonVisibleOnEveryRow(UnifiedPage page) {
-        page.navigate("/plan");
+        page.navigate(PlanView.class);
         assertThat(page.find(UnifiedButton.class).withTestId("meal-action-pin")).hasCount(7);
     }
 
@@ -244,7 +245,7 @@ class PlanViewIT {
     @DisplayName("A meal the AI swapped is marked edited after a reload")
     void editedPillRendersAfterAiSwap(UnifiedPage page) {
         // given
-        page.navigate("/plan");
+        page.navigate(PlanView.class);
         Meal thursdayMeal = findMealForDay(DayOfWeek.THURSDAY);
 
         // when: an AI swap (sets lastEditedBy=AI, lastEditedAt=now, status=EDITED), then a reload
@@ -300,7 +301,7 @@ class PlanViewIT {
     @DisplayName("A pinned meal can't be swapped and is still shown after a reload")
     void pinnedMealRejectsSwap(UnifiedPage page) {
         // given: Monday is pinned (UC-003 explicit-editor overload)
-        page.navigate("/plan");
+        page.navigate(PlanView.class);
         Meal mondayMeal = findMealForDay(DayOfWeek.MONDAY);
         String newRecipeRef = findAlternativeRecipe(mondayMeal.getRecipeRef());
         planService.setPinned(mondayMeal.getId(), true, Meal.Editor.USER);
@@ -325,7 +326,7 @@ class PlanViewIT {
     @DisplayName("Asking for a swap from the plan shows the assistant's reply")
     void chatRoundTripOnPlanViewWithStubbedSwap(UnifiedPage page) {
         // given
-        page.navigate("/plan");
+        page.navigate(PlanView.class);
         String reply = "Swapped Thursday’s meal for a vegetarian option — kid-friendly pea risotto, under 30 min.";
         chatModel.queueReply(reply);
 
@@ -344,7 +345,7 @@ class PlanViewIT {
     @Test
     @DisplayName("Each day's pin button can be found by its date")
     void pinButtonHasDataPinDateAttribute(UnifiedPage page) {
-        page.navigate("/plan");
+        page.navigate(PlanView.class);
         LocalDate monday = findMealForDay(DayOfWeek.MONDAY).getDate();
         assertThat(page.find(UnifiedButton.class).withAttribute("data-pin-date", monday.toString())).isVisible();
     }
@@ -381,7 +382,7 @@ class PlanViewIT {
     @DisplayName("A day the AI changed has an undo button")
     void undoButtonVisibleOnRowWithEditHistory(UnifiedPage page) {
         // given
-        page.navigate("/plan");
+        page.navigate(PlanView.class);
         aiSwap(DayOfWeek.WEDNESDAY, "vegetarian swap for IT");
 
         // when
@@ -399,7 +400,7 @@ class PlanViewIT {
     @DisplayName("A day the AI didn't change has no undo button")
     void undoButtonNotVisibleOnRowWithNoHistory(UnifiedPage page) {
         // given: Wednesday swapped (the feature is active), Monday untouched
-        page.navigate("/plan");
+        page.navigate(PlanView.class);
         aiSwap(DayOfWeek.WEDNESDAY, "vegetarian swap for IT");
 
         // when
@@ -419,7 +420,7 @@ class PlanViewIT {
     @DisplayName("Undoing an AI change restores the previous meal and records the undo")
     void clickingRowUndoRestoresPreviousRecipeAndWritesUndoAuditRow(UnifiedPage page) {
         // given
-        page.navigate("/plan");
+        page.navigate(PlanView.class);
         Meal thursday = findMealForDay(DayOfWeek.THURSDAY);
         String originalRef = thursday.getRecipeRef();
         planService.swapMeal(thursday.getId(), findAlternativeRecipe(originalRef), "swap for IT undo test");
@@ -447,7 +448,7 @@ class PlanViewIT {
     @DisplayName("Asking why a day was changed sends the question to the assistant")
     void whyButtonClickSubmitsChatMessageAndReceivesReply(UnifiedPage page) {
         // given
-        page.navigate("/plan");
+        page.navigate(PlanView.class);
         aiSwap(DayOfWeek.FRIDAY, "fish swap for IT why test");
         page.reload();
         chatModel.queueReply("I swapped Friday because of your fish allergy preference.");
@@ -467,7 +468,7 @@ class PlanViewIT {
     @DisplayName("A day the AI changed has a why button")
     void whyButtonVisibleOnRowWithEditHistory(UnifiedPage page) {
         // given
-        page.navigate("/plan");
+        page.navigate(PlanView.class);
         aiSwap(DayOfWeek.TUESDAY, "swap for IT why-visible test");
 
         // when
@@ -485,7 +486,7 @@ class PlanViewIT {
     @DisplayName("Undoing a change on a pinned meal is refused with a notification")
     void undoOnPinnedMealShowsPinnedNotification(UnifiedPage page) {
         // given: Monday has an AI edit (so the undo button shows) and is then pinned
-        page.navigate("/plan");
+        page.navigate(PlanView.class);
         Meal monday = aiSwap(DayOfWeek.MONDAY, "swap for IT pinned-undo test");
         planService.setPinned(monday.getId(), true, Meal.Editor.USER);
         page.reload();
@@ -505,7 +506,7 @@ class PlanViewIT {
     @DisplayName("The KPI strip is still shown after an undo")
     void kpiStripStillRenderedAfterUndo(UnifiedPage page) {
         // given
-        page.navigate("/plan");
+        page.navigate(PlanView.class);
         aiSwap(DayOfWeek.WEDNESDAY, "swap for IT kpi-post-undo test");
         page.reload();
 

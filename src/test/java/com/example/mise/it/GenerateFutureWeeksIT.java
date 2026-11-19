@@ -1,5 +1,6 @@
 package com.example.mise.it;
 
+import com.example.mise.ui.plan.PlanView;
 import com.example.mise.it.support.TestChatModel;
 import com.vaadin.testing.unified.UnifiedPage;
 import com.vaadin.testing.unified.spring.UnifiedSpringBootTest;
@@ -171,7 +172,7 @@ class GenerateFutureWeeksIT {
     @DisplayName("With a planned week ahead, the next-week button is enabled on the active week")
     void activeWeekNextChevronIsEnabledWhenPlannedPlanExists(UnifiedPage page) {
         // when: default navigation lands on the active week (/plan without ?week=)
-        page.navigate("/plan");
+        page.navigate(PlanView.class);
 
         // then: one planned plan lies ahead
         assertThat(nextWeekButton(page)).isVisible();
@@ -186,7 +187,7 @@ class GenerateFutureWeeksIT {
     @DisplayName("Clicking next week opens the planned week, marked as a future week")
     void clickNextNavigatesToPlannedWeekWithFutureBadge(UnifiedPage page) {
         // given
-        page.navigate("/plan");
+        page.navigate(PlanView.class);
 
         // when
         nextWeekButton(page).click();
@@ -204,6 +205,7 @@ class GenerateFutureWeeksIT {
     @DisplayName("Opening the planned week by URL shows it as a future week")
     void directNavigateToPlannedWeekShowsFutureBadge(UnifiedPage page) {
         // when
+        // a path: UnifiedPage.navigate has no Class + query-parameters overload
         page.navigate("/plan?week=" + plannedPlan.getWeekStartDate());
 
         // then
@@ -218,6 +220,7 @@ class GenerateFutureWeeksIT {
     @DisplayName("The planned week shows a meal for each of the seven days")
     void directNavigateToPlannedWeekRendersSevenMealRows(UnifiedPage page) {
         // when
+        // a path: UnifiedPage.navigate has no Class + query-parameters overload
         page.navigate("/plan?week=" + plannedPlan.getWeekStartDate());
 
         // then

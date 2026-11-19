@@ -210,3 +210,7 @@ The "Running on the other Testing Tools" section of the migration guide mentions
 | F22 | API | no grid column-header assertion | medium | #359 |
 | F23 | API | `UnifiedDiv` / `UnifiedSpan` have no `click()` | medium | #358 |
 | F24 | behaviour | Browserless passes CSS-hidden inputs (documented, worth a louder note) | low | #367 |
+
+### F25: The recipe emits a path for a static `getView()`, and there is no Class + query-parameters `navigate`. Verified · [#370](https://github.com/parttio/unified-testing-tool/issues/370)
+
+The recipe turns `getView()` returning `"/plan"` into `page.navigate("/plan")`. When the literal resolves to exactly one `@Route`, `page.navigate(PlanView.class)` is the canonical form: it fails at compile time on a route rename, and its report reads `open Plan` rather than `open “/plan”`. In Mise, 72 of 76 navigations were moved to the class form by hand. The remaining 4 carry `?week=…`, and `UnifiedPage` has no `navigate(Class, QueryParameters)`.

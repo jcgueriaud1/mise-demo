@@ -1,5 +1,6 @@
 package com.example.mise.it;
 
+import com.example.mise.ui.onboarding.OnboardingView;
 import com.example.mise.it.support.TestChatModel;
 import com.vaadin.testing.unified.UnifiedPage;
 import com.vaadin.testing.unified.spring.UnifiedSpringBootTest;
@@ -77,7 +78,7 @@ class OnboardingRedirectIT {
     @DisplayName("A user who already has a household is sent from the welcome page to the plan")
     void existingHouseholdRedirectsToPlan(UnifiedPage page) {
         // when
-        page.navigate("/welcome");
+        page.navigate(OnboardingView.class);
 
         // then
         assertThat(page).isAt(PlanView.class);

@@ -1,5 +1,6 @@
 package com.example.mise.it;
 
+import com.example.mise.ui.shopping.ShoppingView;
 import com.example.mise.it.support.TestChatModel;
 import com.vaadin.testing.unified.RequiresTestingTool;
 import com.vaadin.testing.unified.TestingTool;
@@ -159,7 +160,7 @@ class ShoppingViewIT {
     void hasPageTitle(UnifiedPage page) {
         // Escape Hatch kept: the Unified API has no page-title assertion
         Page playwright = page.unwrap(Page.class);
-        page.navigate("/shopping");
+        page.navigate(ShoppingView.class);
         com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat(playwright).hasTitle("Mise — Shopping");
     }
 
@@ -171,7 +172,7 @@ class ShoppingViewIT {
     @Test
     @DisplayName("The shopping page names the recommended store")
     void recommendedStoreBadgeIsVisible(UnifiedPage page) {
-        page.navigate("/shopping");
+        page.navigate(ShoppingView.class);
 
         assertThat(page.find(UnifiedSpan.class).withId("mise-shopping-store-recommended")).exists();
         UnifiedGenericComponent storeHeadline = recommendationPanel(page).findComponent(H2.class)
@@ -186,7 +187,7 @@ class ShoppingViewIT {
     @Test
     @DisplayName("The shopping page shows the total cost in euros")
     void totalCostSpanShowsEuroSign(UnifiedPage page) {
-        page.navigate("/shopping");
+        page.navigate(ShoppingView.class);
         UnifiedContainer totalCost = page.find(UnifiedContainer.class).withTestId("shopping-total-cost");
         assertThat(totalCost).isVisible();
         assertThat(totalCost).hasTextContaining("€");
@@ -200,7 +201,7 @@ class ShoppingViewIT {
     @Test
     @DisplayName("The store mode toggle offers one store or the cheapest mix")
     void storeModeToggleIsVisible(UnifiedPage page) {
-        page.navigate("/shopping");
+        page.navigate(ShoppingView.class);
         UnifiedContainer panel = recommendationPanel(page);
         assertThat(panel.find(UnifiedContainer.class).withTestId("store-mode-toggle")).isVisible();
         assertThat(storeModeButton(panel, "store-mode-one")).isVisible();
@@ -213,7 +214,7 @@ class ShoppingViewIT {
     @Test
     @DisplayName("The shopping page has a pantry section")
     void pantrySectionExistsInDom(UnifiedPage page) {
-        page.navigate("/shopping");
+        page.navigate(ShoppingView.class);
         assertThat(page.find(UnifiedDetails.class).withTestId("pantry-section")).exists();
     }
 
@@ -223,7 +224,7 @@ class ShoppingViewIT {
     @Test
     @DisplayName("The shopping list is grouped by aisle")
     void atLeastOneAisleGroupRendered(UnifiedPage page) {
-        page.navigate("/shopping");
+        page.navigate(ShoppingView.class);
         assertThat(page.find(UnifiedDiv.class).withClassName("mise-shopping-aisle-group")).exists();
     }
 
@@ -233,7 +234,7 @@ class ShoppingViewIT {
     @Test
     @DisplayName("The shopping list has items")
     void atLeastOneShoppingRowRendered(UnifiedPage page) {
-        page.navigate("/shopping");
+        page.navigate(ShoppingView.class);
         assertThat(shoppingRows(page)).exists();
     }
 
@@ -246,7 +247,7 @@ class ShoppingViewIT {
     @Test
     @DisplayName("An ingredient used by several meals is listed once")
     void pastaIngredientAppearsAtMostOnce(UnifiedPage page) {
-        page.navigate("/shopping");
+        page.navigate(ShoppingView.class);
         assertThat(shoppingRows(page)).exists();
         Assertions.assertThat(shoppingRows(page).withTextContaining("pasta").all())
                 .as("AC #2: pasta must appear as at most one consolidated row, never duplicated")
@@ -261,7 +262,7 @@ class ShoppingViewIT {
     @DisplayName("A pantry staple is left off the shopping list")
     void stapleOliveOilIsSuppressedFromShoppingList(UnifiedPage page) {
         // given: olive oil is a pantry staple
-        page.navigate("/shopping");
+        page.navigate(ShoppingView.class);
         var household = householdService.findHousehold().orElseThrow();
         var oliveOil = new PantryItem();
         oliveOil.setHouseholdId(household.getId());
@@ -286,7 +287,7 @@ class ShoppingViewIT {
     @DisplayName("The chosen store mode is remembered after a reload")
     void storeModeTogglePersistsAcrossReload(UnifiedPage page) {
         // given
-        page.navigate("/shopping");
+        page.navigate(ShoppingView.class);
 
         // when
         storeModeButton(recommendationPanel(page), "store-mode-mix").click();
@@ -321,7 +322,7 @@ class ShoppingViewIT {
     @DisplayName("Marking an item as already had removes it and adds it to the pantry")
     void alreadyHaveButtonRemovesRowAndCreatesPantryItem(UnifiedPage page) {
         // given
-        page.navigate("/shopping");
+        page.navigate(ShoppingView.class);
         assertThat(shoppingRows(page)).exists();
         int before = shoppingRows(page).all().size();
         String ingredientName = shoppingRows(page).all().getFirst().find(UnifiedSpan.class)
@@ -348,7 +349,7 @@ class ShoppingViewIT {
     @DisplayName("Swapping a meal in the plan updates the shopping list")
     void planSwapReflowsShoppingList(UnifiedPage page) {
         // given
-        page.navigate("/shopping");
+        page.navigate(ShoppingView.class);
         var household = householdService.findHousehold().orElseThrow();
         var plan = planService.findActivePlan(household.getId()).orElseThrow();
         var targetMeal = planService.findMeals(plan.getId()).stream()

@@ -1,5 +1,6 @@
 package com.example.mise.it;
 
+import com.example.mise.ui.onboarding.OnboardingView;
 import org.junit.jupiter.api.BeforeEach;
 import com.example.mise.it.support.TestChatModel;
 import com.vaadin.testing.unified.UnifiedPage;
@@ -54,7 +55,7 @@ class OnboardingViewIT {
     @DisplayName("A new user is greeted by the assistant on the welcome page")
     void seededGreetingRendersOnFirstLoad(UnifiedPage page) {
         // when
-        page.navigate("/welcome");
+        page.navigate(OnboardingView.class);
 
         // then
         UnifiedMessageList messages = page.find(UnifiedMessageList.class);
@@ -66,7 +67,7 @@ class OnboardingViewIT {
     @DisplayName("The user's answer and the assistant's reply appear in the onboarding chat")
     void userInputRoundTripsThroughStubbedAssistant(UnifiedPage page) {
         // given
-        page.navigate("/welcome");
+        page.navigate(OnboardingView.class);
         chatModel.queueReply("Got it — two adults, no fish, €90/week. Sound right?");
         UnifiedMessageList messages = page.find(UnifiedMessageList.class);
 
@@ -83,7 +84,7 @@ class OnboardingViewIT {
     @DisplayName("Without a queued reply the stub answers with a sentinel instead of calling the real LLM")
     void defaultReplyUsedWhenTestForgetsToQueueOne(UnifiedPage page) {
         // given: no queueReply(), a guardrail so a forgotten one can't call the (unreachable) real LLM
-        page.navigate("/welcome");
+        page.navigate(OnboardingView.class);
         UnifiedMessageList messages = page.find(UnifiedMessageList.class);
 
         // when
@@ -108,7 +109,7 @@ class OnboardingViewIT {
     @DisplayName("The onboarding conversation is saved as an ONBOARDING conversation")
     void messagesPersistedWithOnboardingViewContext(UnifiedPage page) {
         // given
-        page.navigate("/welcome");
+        page.navigate(OnboardingView.class);
         chatModel.queueReply("Noted — I'll keep your preferences in mind.");
         UnifiedMessageList messages = page.find(UnifiedMessageList.class);
 

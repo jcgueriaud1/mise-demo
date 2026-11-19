@@ -1,5 +1,6 @@
 package com.example.mise.it;
 
+import com.example.mise.ui.plan.PlanView;
 import com.example.mise.it.support.TestChatModel;
 import com.vaadin.testing.unified.UnifiedPage;
 import com.vaadin.testing.unified.spring.UnifiedSpringBootTest;
@@ -108,7 +109,7 @@ class ChatBusyStopIT {
     @DisplayName("A second message sent while the assistant is busy is ignored with a busy note")
     void submittingWhileBusy_showsBusyNote_andSuppressesPrompt(UnifiedPage page) throws Exception {
         // given: a first turn held in flight by the pause latch
-        page.navigate("/plan");
+        page.navigate(PlanView.class);
         CountDownLatch responseLatch = chatModel.pauseNextResponse();
         chatModel.queueReply("Sure — Thursday is Roasted Vegetable Pasta.");
         UnifiedContainer chatDock = chatDock(page);
@@ -142,7 +143,7 @@ class ChatBusyStopIT {
     @DisplayName("Typing stop when nothing is running only shows a note")
     void stopWhileIdle_showsNothingRunning_andNeverCallsModel(UnifiedPage page) {
         // given
-        page.navigate("/plan");
+        page.navigate(PlanView.class);
 
         // when
         chatDock(page).find(UnifiedMessageInput.class).send("stop");
@@ -164,7 +165,7 @@ class ChatBusyStopIT {
     @DisplayName("Typing stop while the assistant answers cancels it and keeps the partial reply")
     void stopWhileBusy_cancelsTurn_keepsPartialWithStoppedMarker(UnifiedPage page) {
         // given: a turn whose stream never completes on its own
-        page.navigate("/plan");
+        page.navigate(PlanView.class);
         chatModel.holdNextResponseOpen("Here is what I am working on");
         UnifiedContainer chatDock = chatDock(page);
         UnifiedMessageInput input = chatDock.find(UnifiedMessageInput.class);
