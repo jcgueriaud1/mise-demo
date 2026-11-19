@@ -26,3 +26,5 @@ NoSuchMethodError: 'org.springframework.ai.chat.client.advisor.MessageChatMemory
 **One related quirk:** Vaadin's `AIOrchestrator` creates the assistant `ChatMessage` with `messageId = null` (verified in `streamResponseToMessage` bytecode). Any persistence layer that dedupes on messageId will silently drop the assistant turn. Sync by list index against `repository.count()` instead. See `ConversationService.syncFromOrchestrator` in this repo.
 
 Related: [[project-h2-console-autoconfig]] (Spring Boot 4 also dropped the H2 console auto-config).
+
+**Update 2026-11-19 (Vaadin 25.3.5):** the AI components moved to `vaadin-ai-core-flow` + `vaadin-ai-extensions-flow` (transitive via `vaadin`); `vaadin-ai-components-flow` stops at 25.2.x. 25.3.5 declares Spring AI **2.0.1** (what the pom pins). `AIController` callbacks changed: `onRequest()` → `onRequest(RequestListener.RequestEvent)`, `onResponse(Throwable)` → `onResponse(ResponseListener.ResponseEvent)` (`event.getError()` is an `Optional`). Check `vaadin-ai-core-flow`'s POM when bumping.

@@ -1,6 +1,8 @@
 package com.example.mise.ui.reports;
 
 import com.vaadin.flow.component.ai.orchestrator.AIController;
+import com.vaadin.flow.component.ai.orchestrator.RequestListener;
+import com.vaadin.flow.component.ai.orchestrator.ResponseListener;
 import com.vaadin.flow.component.ai.provider.LLMProvider;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
@@ -158,19 +160,19 @@ class ReportsAIController implements AIController {
     }
 
     @Override
-    public void onRequest() {
-        delegates.forEach(AIController::onRequest);
+    public void onRequest(RequestListener.RequestEvent event) {
+        delegates.forEach(delegate -> delegate.onRequest(event));
     }
 
     @Override
-    public void onResponse(Throwable error) {
+    public void onResponse(ResponseListener.ResponseEvent event) {
         // Fan out so every wrapped controller applies (or discards) its pending
         // state; a failure in one widget's render must not block the others.
         // The first failure is rethrown so the orchestrator surfaces it.
         RuntimeException first = null;
         for (AIController delegate : delegates) {
             try {
-                delegate.onResponse(error);
+                delegate.onResponse(event);
             } catch (RuntimeException e) {
                 if (first == null) first = e;
             }

@@ -9,7 +9,7 @@ Issues found along the way: [`findings.md`](findings.md)
 | Step | What | Status |
 |---|---|---|
 | 0 | Research, inventory, plan | **Done** (this commit) |
-| 1 | Bump Vaadin 25.2.6 → 25.3.x (+ Spring AI realign) | Blocked: waiting on approval (pom change) |
+| 1 | Bump Vaadin 25.2.6 → 25.3.5 (+ Spring AI realign) | **Done**: unit 193 ✓, IT 74 ✓, AIIT not run (no LLM endpoint) |
 | 2 | Bump DramaFinder 1.2.0 → 2.2.0 | Not started |
 | 3 | Baseline commit before the recipe | Not started |
 | 4 | Run the OpenRewrite migration recipes | Not started |
@@ -140,3 +140,25 @@ The recipe has Wrappers only for TextField, TextArea, Button, Notification, Chec
   - The migration pages *do* resolve, at the site root; the 404 came from a URL I built wrongly.
   - `unified-test-demo` in `~/.m2` is a local install, not a Central artifact.
 - **No build was run** in this round, by decision.
+
+---
+
+## Step 1: Vaadin 25.2.6 → 25.3.5 (2026-11-19)
+
+Approved by the user ("go ahead with the Vaadin 25.3.5 bump").
+
+**Changes**
+- `pom.xml`: `vaadin.version` 25.2.6 → **25.3.5**. `spring-ai.version` stays **2.0.1**, because Vaadin 25.3.5's `vaadin-ai-core-flow` declares `spring-ai-client-chat:2.0.1`, so nothing needed realigning.
+- The AI components now come from `vaadin-ai-core-flow` + `vaadin-ai-extensions-flow`, pulled in transitively by `vaadin`. `vaadin-ai-components-flow` stops at 25.2.x. No import changes were needed: the packages are the same `com.vaadin.flow.component.ai.*`.
+- **One compile break in the app**, not in the tests. `AIController.onRequest()` / `onResponse(Throwable)` became `onRequest(RequestListener.RequestEvent)` / `onResponse(ResponseListener.ResponseEvent)`. `ui/reports/ReportsAIController` (the composite controller for the three Reports widgets) now forwards the event to its delegates.
+- Docs: CLAUDE.md "Sharp edges", the `pom.xml` comment and `.claude/memory/project_vaadin_ai_versions.md` now describe the 25.3 artifacts and the callback change.
+- Side effect: `browserless-test-junit6` resolves to **25.3.2** from the Vaadin 25.3.5 BOM, which is already the version `unified-test-bom` pins. `browserless-test-spring` is still hard-coded at 1.1.2 and is handled in step 4.
+
+**Results**
+- `./mvnw test`: **193 tests, 0 failures**, including `PlanViewBrowserlessTest`.
+- `./mvnw -Pit verify`: **74 ITs, 0 failures** (3 min, including the frontend rebuild for 25.3).
+- `./mvnw -Pai-it verify`: **not run**. This machine has no LLM endpoint (no `application-local.properties`, no `MISE_MODEL_*` env vars). The AIITs drive tool beans through Spring AI's `ChatClient` and don't use the Vaadin AI components that changed, so the risk is low. Run them before merging.
+
+**Not changed (needs approval):** `spec/architecture.md` still says "Vaadin Flow 25.2 … Currently `25.2.0`" and points at `vaadin-ai-components-flow`. CLAUDE.md asks before editing that file.
+
+**How it went:** smooth. The only surprise was the `AIController` signature change. The 25.3 release has it, but nothing in the Spring AI pinning notes would have predicted it.
