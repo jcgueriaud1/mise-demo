@@ -372,3 +372,16 @@ How the executions are set up:
 - **Reloads** use `page.reload()`, and a small `aiSwap(day, reason)` helper replaced 6 copies of the same setup.
 - Kept: the page-title Escape Hatch (F21).
 - **Result:** Playwright 19/19, Browserless 18/18 (title test skipped).
+
+### 7g: ShoppingViewIT
+
+- 43 of 44 markers resolved, so 11 of the 12 tests run everywhere.
+- **Lookups:**
+  - The rows are `find(UnifiedDiv.class).withTestId("shopping-row")`, and the "contains olive oil / red lentils" checks use `withTextContaining(..)` with `exists()` / `doesNotExist()`.
+  - Aisle groups use `withClassName("mise-shopping-aisle-group")`, where the old code used an `[id^=…]` CSS prefix selector.
+  - The pantry section is `UnifiedDetails`.
+- **The "already have" button** is found by the accessible name the app gives it: `"Mark " + ingredient + " as already have"`.
+- **The hand-written wait is gone.** The old test sampled `rows.count()` in a loop with `waitForTimeout(150)` until two samples matched, a guard against a flaky mid-render count. The Unified version reads `all().size()` after a retrying `exists()` and then asserts `hasCount(before - 1)`, relying on Auto-Wait.
+- **The store-mode checks changed meaning.** "The active class" via `hasClass(Pattern)` became `assertThat(button.withClassName("active")).exists()` / `doesNotExist()`. The mobile store badge, which CSS hides on desktop, is now checked for *existence* only. Its visibility is a CSS concern the old test also didn't assert.
+- Kept: the page-title Escape Hatch (F21).
+- **Result:** Playwright 12/12, Browserless 11/11 (title test skipped).
