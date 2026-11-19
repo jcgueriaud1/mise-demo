@@ -2,8 +2,6 @@ package com.example.mise.it;
 
 import org.junit.jupiter.api.BeforeEach;
 import com.example.mise.it.support.TestChatModel;
-import com.vaadin.testing.unified.RequiresTestingTool;
-import com.vaadin.testing.unified.TestingTool;
 import com.vaadin.testing.unified.UnifiedPage;
 import com.vaadin.testing.unified.spring.UnifiedSpringBootTest;
 import com.example.mise.it.support.TestAiConfig;
@@ -12,16 +10,15 @@ import org.springframework.test.context.ActiveProfiles;
 import com.example.mise.domain.conversation.ConversationMessage;
 import com.example.mise.domain.conversation.ConversationMessageRepository;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import com.example.mise.it.support.wrappers.UnifiedMessageInput;
+import com.example.mise.it.support.wrappers.UnifiedMessageList;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.vaadin.addons.dramafinder.element.MessageInputElement;
-import org.vaadin.addons.dramafinder.element.MessageListElement;
 
 import org.assertj.core.api.Assertions;
 
-import com.microsoft.playwright.Page;
 
-import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
 
 /**
  * UC-001 round-trip IT against a deterministic {@link com.example.mise.it.support.TestChatModel}.
@@ -54,61 +51,47 @@ class OnboardingViewIT {
     ConversationMessageRepository conversationMessageRepository;
 
     @Test
-    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    @DisplayName("A new user is greeted by the assistant on the welcome page")
     void seededGreetingRendersOnFirstLoad(UnifiedPage page) {
-        Page playwright = page.unwrap(Page.class);
+        // when
         page.navigate("/welcome");
-        // TODO unified: Dramafinder Escape Hatch: MessageListElement.get(playwright)
-        MessageListElement messages = MessageListElement.get(playwright);
-        // TODO unified: Dramafinder Escape Hatch: messages.assertMessageCount(1)
-        messages.assertMessageCount(1);
-        // TODO unified: Dramafinder Escape Hatch: assertThat(messages.getMessage(0)).containsText(OPENING_GREETING_FRAGMENT)
-        assertThat(messages.getMessage(0)).containsText(OPENING_GREETING_FRAGMENT);
+
+        // then
+        UnifiedMessageList messages = page.find(UnifiedMessageList.class);
+        page.waitUntil(() -> messages.getMessageCount() == 1);
+        Assertions.assertThat(messages.getMessageText(0)).contains(OPENING_GREETING_FRAGMENT);
     }
 
     @Test
-    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    @DisplayName("The user's answer and the assistant's reply appear in the onboarding chat")
     void userInputRoundTripsThroughStubbedAssistant(UnifiedPage page) {
-        Page playwright = page.unwrap(Page.class);
+        // given
         page.navigate("/welcome");
         chatModel.queueReply("Got it — two adults, no fish, €90/week. Sound right?");
+        UnifiedMessageList messages = page.find(UnifiedMessageList.class);
 
-        // TODO unified: Dramafinder Escape Hatch: MessageInputElement.get(playwright)
-        MessageInputElement input = MessageInputElement.get(playwright);
-        // TODO unified: Dramafinder Escape Hatch: MessageListElement.get(playwright)
-        MessageListElement messages = MessageListElement.get(playwright);
+        // when
+        page.find(UnifiedMessageInput.class).send("Two adults, no fish, around €90 a week");
 
-        // TODO unified: Dramafinder Escape Hatch: input.typeAndSubmit("Two adults, no fish, around €90 a week")
-        input.typeAndSubmit("Two adults, no fish, around €90 a week");
-
-        // Greeting + user + assistant
-        // TODO unified: Dramafinder Escape Hatch: // Greeting + user + assistantmessages.assertMessageCount(3)
-        messages.assertMessageCount(3);
-        // TODO unified: Dramafinder Escape Hatch: assertThat(messages.getMessage(1)).containsText("Two adults, no fish")
-        assertThat(messages.getMessage(1)).containsText("Two adults, no fish");
-        // TODO unified: Dramafinder Escape Hatch: assertThat(messages.getMessage(2)).containsText("Got it — two adults, no fish")
-        assertThat(messages.getMessage(2)).containsText("Got it — two adults, no fish");
+        // then: greeting + user + assistant
+        page.waitUntil(() -> messages.getMessageCount() == 3);
+        Assertions.assertThat(messages.getMessageText(1)).contains("Two adults, no fish");
+        Assertions.assertThat(messages.getMessageText(2)).contains("Got it — two adults, no fish");
     }
 
     @Test
-    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    @DisplayName("Without a queued reply the stub answers with a sentinel instead of calling the real LLM")
     void defaultReplyUsedWhenTestForgetsToQueueOne(UnifiedPage page) {
-        Page playwright = page.unwrap(Page.class);
+        // given: no queueReply(), a guardrail so a forgotten one can't call the (unreachable) real LLM
         page.navigate("/welcome");
-        // Guardrail: a forgotten queueReply() shouldn't silently call the (unreachable) real LLM.
-        // The stub falls back to a sentinel string instead.
-        // TODO unified: Dramafinder Escape Hatch: MessageInputElement.get(playwright)
-        MessageInputElement input = MessageInputElement.get(playwright);
-        // TODO unified: Dramafinder Escape Hatch: MessageListElement.get(playwright)
-        MessageListElement messages = MessageListElement.get(playwright);
+        UnifiedMessageList messages = page.find(UnifiedMessageList.class);
 
-        // TODO unified: Dramafinder Escape Hatch: input.typeAndSubmit("hello")
-        input.typeAndSubmit("hello");
+        // when
+        page.find(UnifiedMessageInput.class).send("hello");
 
-        // TODO unified: Dramafinder Escape Hatch: messages.assertMessageCount(3)
-        messages.assertMessageCount(3);
-        // TODO unified: Dramafinder Escape Hatch: assertThat(messages.getMessage(2)).containsText("no reply queued")
-        assertThat(messages.getMessage(2)).containsText("no reply queued");
+        // then
+        page.waitUntil(() -> messages.getMessageCount() == 3);
+        Assertions.assertThat(messages.getMessageText(2)).contains("no reply queued");
     }
 
     /**
@@ -120,32 +103,24 @@ class OnboardingViewIT {
      * We use an absolute "at least one" check rather than a delta because the Spring test
      * context (and its in-memory H2) is shared across tests in this class — earlier tests
      * that trigger {@code onResponseComplete} may already have deposited ONBOARDING rows.
-     * Asserting existence (rather than delta) is stable and still verifies the viewContext
-     * column is set correctly for newly written rows.
      */
     @Test
-    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    @DisplayName("The onboarding conversation is saved as an ONBOARDING conversation")
     void messagesPersistedWithOnboardingViewContext(UnifiedPage page) {
-        Page playwright = page.unwrap(Page.class);
+        // given
         page.navigate("/welcome");
         chatModel.queueReply("Noted — I'll keep your preferences in mind.");
-        // TODO unified: Dramafinder Escape Hatch: MessageInputElement.get(playwright)
-        MessageInputElement input = MessageInputElement.get(playwright);
+        UnifiedMessageList messages = page.find(UnifiedMessageList.class);
 
-        // TODO unified: Dramafinder Escape Hatch: input.typeAndSubmit("Two adults, no allergies, €80/week")
-        input.typeAndSubmit("Two adults, no allergies, €80/week");
+        // when
+        page.find(UnifiedMessageInput.class).send("Two adults, no allergies, €80/week");
+        // the assistant reply has landed, so onResponseComplete has flushed to the repository
+        page.waitUntil(() -> messages.getMessageCount() == 3);
 
-        // Wait for the assistant reply to land in the MessageList before checking the DB,
-        // ensuring onResponseComplete has had time to flush to the repository.
-        // TODO unified: Dramafinder Escape Hatch: MessageListElement.get(playwright)
-        MessageListElement messages = MessageListElement.get(playwright);
-        // TODO unified: Dramafinder Escape Hatch: messages.assertMessageCount(3)
-        messages.assertMessageCount(3);
-
+        // then
         long onboardingCount = conversationMessageRepository.findAll().stream()
                 .filter(m -> m.getViewContext() == ConversationMessage.ViewContext.ONBOARDING)
                 .count();
-
         Assertions.assertThat(onboardingCount).isGreaterThan(0);
     }
 }

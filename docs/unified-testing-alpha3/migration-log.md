@@ -292,3 +292,28 @@ How the executions are set up:
 **Results** (`./mvnw -Pit verify`): surefire **193 ✓**, it-playwright **74 ✓**, it-browserless **2 ✓ / 72 skipped**, `BUILD SUCCESS`. `summary.md` reads `### Unified UI Tests · Browserless · 2 passed, 0 failed, 72 skipped`.
 
 **How it went:** straightforward Maven work. The one trap was the parent POM's `default` execution.
+
+---
+
+## Step 7: Resolve the Migration Markers (2026-11-19)
+
+`resolve-migration-markers` has `disable-model-invocation: true` (F9), so the agent followed its written procedure by hand: one class at a time, each run on Playwright **and** Browserless before moving on. Sub-commits are `step 7a`, `7b`, and so on.
+
+### 7a: Shared Wrappers + OnboardingViewIT
+
+- **Wrappers** in `src/test/java/com/example/mise/it/support/wrappers/` (F7):
+  - `UnifiedMessageInput.send(text)` / `focus()`. In a browser it fills the input and clicks `vaadin-message-input-button`. Its Browserless override, `UnifiedMessageInputBrowserless`, uses `MessageInputTester.send(..)`.
+  - `UnifiedMessageList.getMessageTexts()` / `getMessageCount()` / `getMessageText(i)`. In a browser it reads the `vaadin-message` children. Its Browserless override uses the server-side `MessageList.getItems()`.
+  - Both have their own report words: `send “…” with message input`.
+- **`OnboardingViewIT`:**
+  - All 18 markers resolved, and the 4 tests no longer need `@RequiresTestingTool`.
+  - Message-count checks use `page.waitUntil(() -> messages.getMessageCount() == n)`. These Wrappers have no retrying assertion of their own, so the reports show them as a gap.
+  - Every test got a `@DisplayName` and given/when/then markers.
+- **The Browserless run exposed a real app bug.** `OnboardingView.beforeEnter()` built a new `AIOrchestrator` every time it ran. Browserless starts the UI at `""`, which forwards to `/welcome`, and the test's `navigate("/welcome")` then *re-enters the same view instance*. The second build claimed the same `LLMProvider` and threw `CancellableLLMProvider is already in use by another AIOrchestrator`. A browser never hits this, because every navigation is a fresh page load and so a fresh view. The fix builds the UI once per instance (`if (orchestrator == null) buildUI();`).
+- **Result:** `OnboardingViewIT` passes **4/4 on Playwright and 4/4 on Browserless**. Its User Steps:
+  ```
+  ✔ OnboardingViewIT › The user's answer and the assistant's reply appear in the onboarding chat   browserless · 0.0 s
+     1  open “/welcome”
+     2  send “Two adults, no fish, around €90 a week” with message input
+     … 1 call outside the Unified API (waitUntil)
+  ```

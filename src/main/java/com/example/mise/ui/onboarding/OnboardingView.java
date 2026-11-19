@@ -97,7 +97,12 @@ public class OnboardingView extends VerticalLayout implements BeforeEnterObserve
             event.forwardTo("plan");
             return;
         }
-        buildUI();
+        // Once per view instance: re-entering the same instance (a navigation to /welcome while
+        // already on it) must not build a second AIOrchestrator, which would claim the injected
+        // LLMProvider twice and fail ("already in use by another AIOrchestrator").
+        if (orchestrator == null) {
+            buildUI();
+        }
     }
 
     private void buildUI() {

@@ -139,3 +139,20 @@ In Mise the recipe converted 1/12 IT classes on the first run, 7/12 after the ba
 
 Running the same ITs on two Testing Tools in one Maven build means two failsafe executions. Unless each one gets its own `reportsDirectory`, `summaryFile` **and** `vaadin.testing.evidence-dir`, the second execution silently overwrites the first one's `summary.md`, `report.html` and failsafe summary. Failsafe's `verify` would then only check the last tool. Also, with Spring Boot's parent POM, the parent's `default` failsafe execution runs everything a third time on the default tool, Browserless. The "Running in CI" guide shows separate *jobs*, not a single build.
 **Suggestion:** document a two-execution Maven snippet (what Mise now uses), or default `evidence-dir` to include the tool name (`unified-evidence/<tool>/`).
+
+### F19: Migration Markers swallow the comment above the statement. Verified
+
+When the converted statement has a comment line above it, the marker repeats the comment glued to the code with no separator:
+```java
+// Focus the message input to trigger :focus-within on the dock, which CSS
+// expands the message-history region from max-height:0 to visible.
+// TODO unified: Dramafinder Escape Hatch: // Focus the message input to trigger :focus-within on the dock, which CSS// expands the message-history region from max-height:0 to visible.input.focus()
+input.focus();
+```
+That happens 24 times in Mise. It hurts the markers' readability and breaks a `grep 'TODO unified: .*Escape Hatch: <call>'`.
+**Suggestion:** print the statement without its leading comments (OpenRewrite's `withPrefix(Space.EMPTY)` / `withComments(List.of())` before `printTrimmed`).
+
+### F20: Browserless finds app bugs the browser hides; that's a plus, but the docs could say so. Verified (positive)
+
+On its first Browserless run, a migrated test failed with `CancellableLLMProvider is already in use by another AIOrchestrator`. The cause was `OnboardingView.beforeEnter()` building a new `AIOrchestrator` each time the *same* view instance was re-entered. Browserless starts at `""` (which forwards to `/welcome`), and the test's `navigate("/welcome")` re-enters that instance. In a browser every navigation is a page load and a new instance, so the bug never shows there, but a user navigating within the app could hit it. The Unified failure message (`Error text: There was an exception while trying to navigate to 'welcome' …`) plus the server log made it quick to find.
+**Suggestion:** the "Running on the other Testing Tools" section could mention that Browserless's first navigation lands on `""`, and that a later `navigate(..)` to the current route reuses the view instance.
