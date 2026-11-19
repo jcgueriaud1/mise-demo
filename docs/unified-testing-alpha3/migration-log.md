@@ -491,7 +491,7 @@ Not run: `./mvnw -Pai-it verify` and `-Pmanual-verify`, because this machine has
 2. ~~**`spec/architecture.md`.**~~ Applied after approval (Vaadin 25.3.5, the AI artifacts, the Spring AI pin list, the Unified test stack and the build commands).
 3. **The AIIT layer.** Run `./mvnw -Pai-it verify` against the live model. The Vaadin 25.3 bump doesn't touch the ChatClient path, but it hasn't been run.
 4. **The `spring-security-core` workaround** (F13) can come out once unified-test-spring fixes the condition.
-5. **Upstream.** The library findings in [`findings.md`](findings.md) are ready to file as issues on parttio/unified-testing-tool.
+5. **Upstream.** Filed as [parttio/unified-testing-tool#368](https://github.com/parttio/unified-testing-tool/issues/368), a tracking issue with 20 sub-issues (#348–#367). F1/F2 were already fixed on `main`, and F19 duplicates #326.
 
 ### Commits
 
