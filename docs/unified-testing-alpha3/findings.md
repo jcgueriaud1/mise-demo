@@ -79,3 +79,48 @@ Its frontmatter has `disable-model-invocation: true`. The guide says to type `/r
 - Two first-pass findings were wrong and were dropped:
   - The site's migration pages do resolve, at the root (`/migrating-from-dramafinder/`).
   - `unified-test-demo` is not on Central; the copy in `~/.m2` was a local install.
+
+## Found while running the migration (steps 4+)
+
+### F6 update: confirmed
+
+The recipe converted 1 of the 12 DramaFinder IT classes, `HomeViewIT`, the only one that uses nothing from the project base class. The other 11 were left byte-for-byte unchanged and got no Migration Marker. The only way to see that they were skipped is to diff the file list against the recipe's "Changes have been made to …" output.
+
+### F10: The recipe drops the annotations of a copied base class. Verified
+
+`MisePlaywrightIT` is recognised as a project copy of `SpringPlaywrightIT` (abstract, extends `AbstractBasePlaywrightIT`, has `@SpringBootTest`). So the migrated `HomeViewIT` gets a bare `@UnifiedSpringBootTest`, and the base class's `@ActiveProfiles("it")` and `@Import(TestAiConfig.class)` are **silently lost**. In Mise this means the test would boot with the default profile: the file H2 at `./data/mise` and the real LLM config instead of the stubbed `TestChatModel`. It compiles, and it may even pass, against the wrong environment. That makes it the most dangerous finding so far.
+**Suggestion:** carry the copy's class-level annotations (`@ActiveProfiles`, `@Import`, `@TestPropertySource`, …) onto each migrated subclass. Or, at minimum, add a class-level marker listing the annotations that weren't carried over.
+
+### F11: `addAgentSkill: true` doesn't write `resolve-migration-markers`. Verified
+
+With `MigrateDramafinderToUnified: { addAgentSkill: true }` in a `rewrite.yml`, the run wrote only `.claude/skills/write-unified-ui-tests/SKILL.md`, although it left 5 `// TODO unified:` markers. `AddMigrationMarkersSkill` is a `ScanningRecipe`. A likely cause is that its scanner looks for markers in the *original* sources, which contain none on a first migration. Not confirmed.
+**Workaround:** copy `META-INF/unified/skills/resolve-migration-markers/SKILL.md` out of the `unified-test-rewrite` jar.
+
+### F12: Validation error, "recipe `IgnoreToDisabled` does not exist". Verified
+
+```
+Recipe validation error … MigrateUIUnitToBrowserless.recipeList[3] (…browserless.yml):
+recipe 'org.openrewrite.java.testing.junit5.IgnoreToDisabled' does not exist.
+```
+The run continues, and the recipe only matters for TestBench UI Unit (Vaadin 24) tests. The likely cause is version skew. The docs' command uses an unpinned `rewrite-maven-plugin` (6.46.1 here, which brings `rewrite-testing-frameworks` 3.44.0), while `unified-test-rewrite` was built against `rewrite-recipe-bom` 3.37.0. A UI Unit project would silently miss the `@Ignore` → `@Disabled` conversion.
+**Suggestion:** pin the plugin version in the documented command, or use the recipe's new name.
+
+### F13: `@UnifiedSpringBootTest` fails in apps without Spring Security. Verified
+
+```
+NoClassDefFoundError: org/springframework/security/core/Authentication
+  at com.vaadin.testing.unified.spring.TestLoginConfiguration$SpringSecurityPresent.matches(TestLoginConfiguration.java:23)
+```
+`spring-security-core` is an `<optional>` dependency of `unified-test-spring`, and the condition is meant to switch test login off without it. But the condition calls `TestLogin.isAvailable()`, and `TestLogin` has `Authentication` in its method signatures. Loading the class to run the check fails before `Class.forName(..)` inside it can return `false`. **Every** `@UnifiedSpringBootTest` in an app without Spring Security fails to start, and Mise has no Spring Security.
+**Suggestion:** check `ClassUtils.isPresent("org.springframework.security.core.context.SecurityContextHolder", cl)` in the condition itself, and keep `TestLogin` unreferenced until it passes. Add a CI test module without Spring Security.
+**Workaround used:** add `spring-security-core` with test scope.
+
+### F14: `browserless-test-spring` is kept with a stale pinned version. Verified
+
+The Browserless build recipe keeps `browserless-test-spring`, which is correct, but leaves its explicit `<version>1.1.2</version>`. That is the old standalone add-on line, now replaced by the 25.x line in the Vaadin and Unified BOMs. The explicit version beats both BOMs, so the build mixes `browserless-test-junit6` 25.3.2 with `browserless-test-spring` 1.1.2.
+**Suggestion:** have the recipe remove the explicit version when a BOM manages the artifact.
+
+### F15: Claude Code doesn't read the generated `AGENTS.md` pointer. Verified
+
+`AddUnifiedTestingSkill` writes the skill pointer to `AGENTS.md`. Claude Code reads `CLAUDE.md`, not `AGENTS.md`, and this project has a `CLAUDE.md` and no `AGENTS.md`. The pointer only works because the skill is also under `.claude/skills/`, where Claude Code discovers it.
+**Suggestion:** when `CLAUDE.md` exists and `AGENTS.md` doesn't, add the marked section to `CLAUDE.md`, or have it import `AGENTS.md`.

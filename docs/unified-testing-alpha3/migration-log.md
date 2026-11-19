@@ -12,7 +12,7 @@ Issues found along the way: [`findings.md`](findings.md)
 | 1 | Bump Vaadin 25.2.6 → 25.3.5 (+ Spring AI realign) | **Done**: unit 193 ✓, IT 74 ✓, AIIT not run (no LLM endpoint) |
 | 2 | Bump DramaFinder 1.2.0 → 2.2.0 | **Done**: IT 74 ✓, no code changes |
 | 3 | Baseline commit before the recipe | **Done**: the step 2 commit is the baseline |
-| 4 | Run the OpenRewrite migration recipes | Not started |
+| 4 | Run the OpenRewrite migration recipes | **Done**: 2 of 13 UI test classes converted; 1 library workaround |
 | 5 | Hand-convert the `MisePlaywrightIT` base class, re-run the recipe | Not started |
 | 6 | Configure the test layers (Playwright + Browserless) | Not started |
 | 7 | Resolve the Migration Markers | Not started |
@@ -176,3 +176,50 @@ Approved by the user ("go ahead with the Vaadin 25.3.5 bump").
 ## Step 3: Baseline
 
 The step 2 commit is the baseline the recipe runs against: Vaadin 25.3.5, DramaFinder 2.2.0, everything green.
+
+---
+
+## Step 4: Run the Migration Recipes (2026-11-19)
+
+**Command.** `rewrite.yml` at the project root declares `com.example.mise.MigrateToUnified`, which runs `MigrateBrowserlessToUnified` and then `MigrateDramafinderToUnified` with `addBrowserless: true` and `addAgentSkill: true`. Then:
+```bash
+./mvnw -U org.openrewrite.maven:rewrite-maven-plugin:run \
+  -Drewrite.recipeArtifactCoordinates=org.vaadin.addons:unified-test-rewrite:0.1.0-alpha3 \
+  -Drewrite.activeRecipes=com.example.mise.MigrateToUnified
+```
+`rewrite-maven-plugin` resolved to 6.46.1, because the docs don't pin it. The run took about 1 min and the plugin estimated "1h 10m" saved.
+
+**What the recipes did**
+- `pom.xml` changes:
+  - imported `unified-test-bom` 0.1.0-alpha3, placed *after* the Vaadin and Spring AI BOMs
+  - added `unified-test-browserless`, `unified-test-playwright` and `unified-test-spring`
+  - removed `browserless-test-junit6` and `dramafinder`, which now arrive transitively, and removed the DramaFinder comment along with them
+  - kept `browserless-test-spring` with its hard-coded `1.1.2`
+- `PlanViewBrowserlessTest`: `@SpringBootTest` → `@UnifiedSpringBootTest`, no base class, `UnifiedPage page` parameter, `navigate` → `page.navigate`. The `$(Button.class).id(..)` lookup and `test(..).click()` went behind a `BrowserlessEscapeHatch` with 2 markers and `@RequiresTestingTool(BROWSERLESS)`.
+- `HomeViewIT`: converted. `getView()` became `page.navigate("/debug")` in each test, and the 3 raw Playwright assertions went behind `page.unwrap(Page.class)` with 3 markers and `@RequiresTestingTool(PLAYWRIGHT)`. **But it lost `@ActiveProfiles("it")` and `@Import(TestAiConfig.class)`**, which lived on the `MisePlaywrightIT` base class (finding F10).
+- New files: `.claude/skills/write-unified-ui-tests/SKILL.md` and `AGENTS.md` (a 4-line section pointing to the skill).
+
+**What it did not do**
+- **11 of the 12 DramaFinder IT classes were left untouched, with no marker** (finding F6, now confirmed):
+  - `OnboardingViewIT` uses the inherited `chatModel` field.
+  - Six override `setupTest()`: `PlanViewIT`, `WeekNavigationIT`, `ChatDockIT`, `ChatBusyStopIT`, `GenerateFutureWeeksIT` and `OnboardingRedirectIT`.
+  - `ManualExamplesReportsIT` and `ManualExamplesStopIT` extend `AbstractBasePlaywrightIT` directly but also override `setupTest()`.
+  - `ReportsViewIT` and `ShoppingViewIT` use `chatModel` or `@BeforeEach` seeding.
+  - `MisePlaywrightIT` stays.
+- **`addAgentSkill: true` didn't write `resolve-migration-markers`** (finding F11).
+- Validation error, not fatal: `recipe 'org.openrewrite.java.testing.junit5.IgnoreToDisabled' does not exist` in `MigrateUIUnitToBrowserless` (finding F12).
+
+**Fixes needed to make the output run**
+1. **`@UnifiedSpringBootTest` fails without Spring Security** (finding F13):
+   - Every context fails with `NoClassDefFoundError: org/springframework/security/core/Authentication`, thrown from `TestLoginConfiguration$SpringSecurityPresent.matches`.
+   - Workaround: a test-scoped `spring-security-core` dependency, version managed by Spring Boot (7.1.1). Spring Boot 4 only auto-configures security through `spring-boot-security`, which isn't on the classpath, so the app's behaviour doesn't change.
+2. **`browserless-test-spring`:** dropped the hard-coded `1.1.2`, so it now resolves to **25.3.2** from the BOMs, the same line as `browserless-test-junit6`. Mise was on the old standalone 1.1.x line.
+
+**Results:** `./mvnw test` gives **193 tests, 0 failures**. `PlanViewBrowserlessTest` passes and writes `target/surefire-reports/unified-evidence/…/user-steps.txt`, `summary.md` and `report.html`. Its User Steps show the Escape Hatch gaps:
+```
+✔ PlanViewBrowserlessTest › rowUndoButtonRestoresPreviousRecipeAndWritesAuditRow   browserless · 1.0 s
+   … 1 call outside the Unified API (Escape Hatch)
+   1  open Plan
+   … 1 call outside the Unified API (Escape Hatch)
+```
+`-Pit` was not run in this step. `HomeViewIT` is known to be mis-configured (no `it` profile) until step 5, and failsafe still runs it on Browserless by default (step 6).
