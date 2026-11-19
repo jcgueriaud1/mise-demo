@@ -14,7 +14,7 @@ Issues found along the way: [`findings.md`](findings.md)
 | 3 | Baseline commit before the recipe | **Done**: the step 2 commit is the baseline |
 | 4 | Run the OpenRewrite migration recipes | **Done**: 2 of 13 UI test classes converted; 1 library workaround |
 | 5 | Hand-prepare the skipped ITs, re-run the recipe | **Done**: 12/12 ITs converted, 74 ✓ on Playwright, 285 markers |
-| 6 | Configure the test layers (Playwright + Browserless) | Not started |
+| 6 | Configure the test layers (Playwright + Browserless) | **Done**: -Pit runs both tools; PW 74 ✓, BL 2 ✓ + 72 skipped |
 | 7 | Resolve the Migration Markers | Not started |
 | 8 | Add the `UnifiedStyleTest` (ArchUnit style rules) | Not started |
 | 9 | Update CLAUDE.md, skills, memory, spec | Not started |
@@ -268,3 +268,27 @@ So 2 tests came out fully Unified and the rest is Escape Hatch with markers, as 
 `resolve-migration-markers` still wasn't generated, even though markers now exist before the run. So F11 isn't the scan-order cause I first guessed.
 
 **How it went:** the recipe is all-or-nothing per class and silent about why it skips one. Getting from 1/12 to 12/12 took two "remove one more base-class member" iterations, each found by elimination, by comparing the converted classes with the skipped ones. Once a class qualified, the conversion was mechanical and correct, and the class-level annotations survived.
+
+---
+
+## Step 6: Configure the test layers (2026-11-19)
+
+**`-Pit` now runs every IT once per Testing Tool**, as two failsafe executions:
+
+| Execution | `vaadin.testing.tool` | Reports + Unified evidence | Result |
+|---|---|---|---|
+| `it-playwright` | `playwright`, headless from `${headless}` (so `-Pdebug-ui` still opens a window), `vaadin.testing.playwright.trace=on-failure` | `target/failsafe-reports/playwright/` | **74 run, 0 failed** |
+| `it-browserless` | `browserless` | `target/failsafe-reports/browserless/` | **2 run, 0 failed, 72 skipped** (`@RequiresTestingTool(PLAYWRIGHT)`) |
+
+How the executions are set up:
+- Each execution has its own `reportsDirectory`, `summaryFile` and `vaadin.testing.evidence-dir`. Otherwise the second run overwrites the first one's failsafe summary, `summary.md` and `report.html`.
+- Either tool can be switched off: `-Dskip.it.browserless=true` / `-Dskip.it.playwright=true`.
+- The spring-boot-starter-parent's own `default` failsafe execution is skipped inside `-Pit`. Without that it ran every IT a third time, on Browserless, the default tool. Before the migration the profile's unnamed execution merged into it, so it went unnoticed (finding F18).
+- `-Pmanual-verify` sets `vaadin.testing.tool=playwright` for the ManualExamples ITs.
+- The old DramaFinder `headless` system property is gone. Unified reads `vaadin.testing.playwright.headless`.
+
+**CI** (`.github/workflows/ci.yml`) runs `./mvnw test` only, and already uploads `target/surefire-reports/` on failure. That now includes `unified-evidence/` for `PlanViewBrowserlessTest`, so nothing needed changing. The deleted `MisePlaywrightIT` screenshot watcher wrote to `target/playwright-screenshots/`, which no workflow uploaded.
+
+**Results** (`./mvnw -Pit verify`): surefire **193 ✓**, it-playwright **74 ✓**, it-browserless **2 ✓ / 72 skipped**, `BUILD SUCCESS`. `summary.md` reads `### Unified UI Tests · Browserless · 2 passed, 0 failed, 72 skipped`.
+
+**How it went:** straightforward Maven work. The one trap was the parent POM's `default` execution.

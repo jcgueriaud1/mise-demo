@@ -134,3 +134,8 @@ The Browserless build recipe keeps `browserless-test-spring`, which is correct, 
 
 In Mise the recipe converted 1/12 IT classes on the first run, 7/12 after the base class was removed, and 12/12 after `getUrl()` was removed. Each blocker was found by comparing converted and skipped classes, because the recipe reports neither which classes it skipped nor why. Also note that a class-level `@BeforeEach` override of `setupTest()` (seed, then `super.setupTest()`) is the standard DramaFinder idiom for "seed before navigating", and the recipe could convert it directly: the `@BeforeEach` stays and the navigation moves into the test.
 **Suggestion:** a dry-run report recipe (`FindDramafinderTests` with reasons): "skipped `PlanViewIT`: uses `setupTest()` override, `getUrl()`".
+
+### F18: Running both tools in one build isn't documented, and the defaults collide. Verified
+
+Running the same ITs on two Testing Tools in one Maven build means two failsafe executions. Unless each one gets its own `reportsDirectory`, `summaryFile` **and** `vaadin.testing.evidence-dir`, the second execution silently overwrites the first one's `summary.md`, `report.html` and failsafe summary. Failsafe's `verify` would then only check the last tool. Also, with Spring Boot's parent POM, the parent's `default` failsafe execution runs everything a third time on the default tool, Browserless. The "Running in CI" guide shows separate *jobs*, not a single build.
+**Suggestion:** document a two-execution Maven snippet (what Mise now uses), or default `evidence-dir` to include the tool name (`unified-evidence/<tool>/`).

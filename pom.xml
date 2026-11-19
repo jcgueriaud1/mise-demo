@@ -201,30 +201,34 @@
     </pluginRepositories>
 
     <profiles>
-        <!-- ./mvnw -Pit verify  -> runs *IT.java end-to-end (headless Playwright). -->
+        <!--
+            ./mvnw -Pit verify  -> runs the *IT.java Unified UI Tests twice, one failsafe execution per
+            Testing Tool:
+              it-playwright   - real headless Chromium (vaadin.testing.tool=playwright); every IT runs.
+              it-browserless  - in-JVM Browserless (vaadin.testing.tool=browserless); tests that still
+                                need a browser declare @RequiresTestingTool(PLAYWRIGHT) and are skipped.
+            Each execution keeps its own reports, failsafe summary and Unified evidence
+            (user-steps.txt, summary.md, report.html) under target/failsafe-reports/<tool>/.
+            Scope one tool / class: -Dit.test=PlanViewIT, or skip a tool with
+            -Dskip.it.browserless / -Dskip.it.playwright.
+        -->
         <profile>
             <id>it</id>
             <properties>
                 <headless>true</headless>
+                <skip.it.playwright>false</skip.it.playwright>
+                <skip.it.browserless>false</skip.it.browserless>
             </properties>
             <build>
                 <plugins>
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-failsafe-plugin</artifactId>
-                        <executions>
-                            <execution>
-                                <goals>
-                                    <goal>integration-test</goal>
-                                    <goal>verify</goal>
-                                </goals>
-                            </execution>
-                        </executions>
                         <configuration>
                             <!--
                                 Failsafe's default include is **/*IT.java, which also matches
                                 **/*AIIT.java (the suffix `IT.java` is a substring of `AIIT.java`).
-                                Exclude AIIT explicitly so -Pit runs Playwright ITs only — AIIT
+                                Exclude AIIT explicitly so -Pit runs the UI ITs only — AIIT
                                 stays gated behind -Pai-it where the live LLM endpoint is wired.
                             -->
                             <excludes>
@@ -232,10 +236,51 @@
                             </excludes>
                             <!-- Manual-example release-gate ITs are opt-in (-Pmanual-verify); never in -Pit. -->
                             <excludedGroups>manual-example</excludedGroups>
-                            <systemPropertyVariables>
-                                <headless>${headless}</headless>
-                            </systemPropertyVariables>
                         </configuration>
+                        <executions>
+                            <!-- spring-boot-starter-parent declares a `default` failsafe execution; without a
+                                 Testing Tool it would run every IT a third time on Browserless. -->
+                            <execution>
+                                <id>default</id>
+                                <configuration>
+                                    <skip>true</skip>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>it-playwright</id>
+                                <goals>
+                                    <goal>integration-test</goal>
+                                    <goal>verify</goal>
+                                </goals>
+                                <configuration>
+                                    <skip>${skip.it.playwright}</skip>
+                                    <reportsDirectory>${project.build.directory}/failsafe-reports/playwright</reportsDirectory>
+                                    <summaryFile>${project.build.directory}/failsafe-reports/playwright/failsafe-summary.xml</summaryFile>
+                                    <systemPropertyVariables>
+                                        <vaadin.testing.tool>playwright</vaadin.testing.tool>
+                                        <vaadin.testing.playwright.headless>${headless}</vaadin.testing.playwright.headless>
+                                        <vaadin.testing.playwright.trace>on-failure</vaadin.testing.playwright.trace>
+                                        <vaadin.testing.evidence-dir>${project.build.directory}/failsafe-reports/playwright/unified-evidence</vaadin.testing.evidence-dir>
+                                    </systemPropertyVariables>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>it-browserless</id>
+                                <goals>
+                                    <goal>integration-test</goal>
+                                    <goal>verify</goal>
+                                </goals>
+                                <configuration>
+                                    <skip>${skip.it.browserless}</skip>
+                                    <reportsDirectory>${project.build.directory}/failsafe-reports/browserless</reportsDirectory>
+                                    <summaryFile>${project.build.directory}/failsafe-reports/browserless/failsafe-summary.xml</summaryFile>
+                                    <systemPropertyVariables>
+                                        <vaadin.testing.tool>browserless</vaadin.testing.tool>
+                                        <vaadin.testing.evidence-dir>${project.build.directory}/failsafe-reports/browserless/unified-evidence</vaadin.testing.evidence-dir>
+                                    </systemPropertyVariables>
+                                </configuration>
+                            </execution>
+                        </executions>
                     </plugin>
                 </plugins>
             </build>
@@ -328,7 +373,9 @@
                             <forkCount>1</forkCount>
                             <reuseForks>true</reuseForks>
                             <systemPropertyVariables>
-                                <headless>${headless}</headless>
+                                <!-- the Playwright+live-LLM ManualExamples*IT are Unified UI Tests; the AIITs ignore it -->
+                                <vaadin.testing.tool>playwright</vaadin.testing.tool>
+                                <vaadin.testing.playwright.headless>${headless}</vaadin.testing.playwright.headless>
                                 <miseit.forkNumber>${surefire.forkNumber}</miseit.forkNumber>
                             </systemPropertyVariables>
                         </configuration>
