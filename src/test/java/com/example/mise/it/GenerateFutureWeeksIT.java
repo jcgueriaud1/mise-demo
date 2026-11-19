@@ -1,14 +1,10 @@
 package com.example.mise.it;
 
-import org.springframework.boot.test.web.server.LocalServerPort;
 import com.example.mise.it.support.TestChatModel;
-import com.vaadin.testing.unified.RequiresTestingTool;
-import com.vaadin.testing.unified.TestingTool;
 import com.vaadin.testing.unified.UnifiedPage;
 import com.vaadin.testing.unified.spring.UnifiedSpringBootTest;
 import com.example.mise.it.support.TestAiConfig;
 
-import com.microsoft.playwright.Page;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 import com.example.mise.capabilities.recipes.RecipeCatalog;
@@ -26,16 +22,19 @@ import com.example.mise.domain.plan.PlanService;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import com.vaadin.testing.unified.component.UnifiedButton;
+import com.vaadin.testing.unified.component.UnifiedDiv;
+import com.vaadin.testing.unified.component.UnifiedSpan;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.regex.Pattern;
 
-import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
+import static com.vaadin.testing.unified.assertion.UnifiedAssertions.assertThat;
 
 /**
  * UC-011 Playwright IT — "generate future weeks" visible surface in the week-navigation header.
@@ -64,12 +63,6 @@ import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertTha
 @UnifiedSpringBootTest
 class GenerateFutureWeeksIT {
 
-    @LocalServerPort
-    int port;
-
-    private String baseUrl() {
-        return "http://localhost:" + port;
-    }
 
     @Autowired
     TestChatModel chatModel;
@@ -175,19 +168,14 @@ class GenerateFutureWeeksIT {
      * next chevron ENABLED (UC-010 only disables it when there is no newer plan).
      */
     @Test
-    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    @DisplayName("With a planned week ahead, the next-week button is enabled on the active week")
     void activeWeekNextChevronIsEnabledWhenPlannedPlanExists(UnifiedPage page) {
-        Page playwright = page.unwrap(Page.class);
+        // when: default navigation lands on the active week (/plan without ?week=)
         page.navigate("/plan");
-        // Default navigation lands on the active week (/plan without ?week=)
-        // TODO unified: Dramafinder Escape Hatch: // Default navigation lands on the active week (/plan without ?week=)assertThat(playwright.locator("#mise-week-next")).isVisible()
-        assertThat(playwright.locator("#mise-week-next")).isVisible();
 
-        // Next must be enabled — there is one planned plan ahead
-        // TODO unified: Dramafinder Escape Hatch: // Next must be enabled — there is one planned plan aheadassertThat(playwright.locator("#mise-week-next")).not().hasAttribute("disabled", "")
-        assertThat(playwright.locator("#mise-week-next")).not().hasAttribute("disabled", "");
-        // TODO unified: Dramafinder Escape Hatch: assertThat(playwright.locator("#mise-week-next")).not().hasAttribute("aria-disabled", "true")
-        assertThat(playwright.locator("#mise-week-next")).not().hasAttribute("aria-disabled", "true");
+        // then: one planned plan lies ahead
+        assertThat(nextWeekButton(page)).isVisible();
+        assertThat(nextWeekButton(page)).isEnabled();
     }
 
     /**
@@ -195,22 +183,17 @@ class GenerateFutureWeeksIT {
      * The badge must show the planned Monday and carry the mise-week-badge--future class.
      */
     @Test
-    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    @DisplayName("Clicking next week opens the planned week, marked as a future week")
     void clickNextNavigatesToPlannedWeekWithFutureBadge(UnifiedPage page) {
-        Page playwright = page.unwrap(Page.class);
+        // given
         page.navigate("/plan");
-        // TODO unified: Dramafinder Escape Hatch: playwright.locator("#mise-week-next").click()
-        playwright.locator("#mise-week-next").click();
 
-        // Wait for navigation: assert the badge text first
-        String expectedBadge = "Week of " + plannedPlan.getWeekStartDate().format(WEEK_FMT);
-        // TODO unified: Dramafinder Escape Hatch: assertThat(playwright.locator("#mise-week-badge")).containsText(expectedBadge)
-        assertThat(playwright.locator("#mise-week-badge")).containsText(expectedBadge);
+        // when
+        nextWeekButton(page).click();
 
-        // The badge must carry the future modifier class (the spec'd visual contract)
-        // TODO unified: Dramafinder Escape Hatch: // The badge must carry the future modifier class (the spec'd visual contract)assertThat(playwright.locator("#mise-week-badge")).hasClass(Pattern.compile(".*mise-week-badge--future.*"))
-        assertThat(playwright.locator("#mise-week-badge"))
-                .hasClass(Pattern.compile(".*mise-week-badge--future.*"));
+        // then
+        assertThat(weekBadge(page)).hasTextContaining(plannedWeekLabel());
+        assertThat(weekBadge(page).withClassName("mise-week-badge--future")).exists();
     }
 
     /**
@@ -218,45 +201,40 @@ class GenerateFutureWeeksIT {
      * the future badge modifier applied.
      */
     @Test
-    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    @DisplayName("Opening the planned week by URL shows it as a future week")
     void directNavigateToPlannedWeekShowsFutureBadge(UnifiedPage page) {
-        Page playwright = page.unwrap(Page.class);
-        page.navigate("/plan");
-        String plannedMonday = plannedPlan.getWeekStartDate().toString();
-        // TODO unified: Dramafinder Escape Hatch: playwright.navigate(baseUrl() + "/plan?week=" + plannedMonday)
-        playwright.navigate(baseUrl() + "/plan?week=" + plannedMonday);
+        // when
+        page.navigate("/plan?week=" + plannedPlan.getWeekStartDate());
 
-        // Badge must show the planned Monday
-        String expectedBadge = "Week of " + plannedPlan.getWeekStartDate().format(WEEK_FMT);
-        // TODO unified: Dramafinder Escape Hatch: assertThat(playwright.locator("#mise-week-badge")).containsText(expectedBadge)
-        assertThat(playwright.locator("#mise-week-badge")).containsText(expectedBadge);
-
-        // Future class must be present
-        // TODO unified: Dramafinder Escape Hatch: // Future class must be presentassertThat(playwright.locator("#mise-week-badge")).hasClass(Pattern.compile(".*mise-week-badge--future.*"))
-        assertThat(playwright.locator("#mise-week-badge"))
-                .hasClass(Pattern.compile(".*mise-week-badge--future.*"));
+        // then
+        assertThat(weekBadge(page)).hasTextContaining(plannedWeekLabel());
+        assertThat(weekBadge(page).withClassName("mise-week-badge--future")).exists();
     }
 
     /**
      * AC: The planned week renders exactly 7 meal-row entries (one per day of the week).
      */
     @Test
-    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    @DisplayName("The planned week shows a meal for each of the seven days")
     void directNavigateToPlannedWeekRendersSevenMealRows(UnifiedPage page) {
-        Page playwright = page.unwrap(Page.class);
-        page.navigate("/plan");
-        String plannedMonday = plannedPlan.getWeekStartDate().toString();
-        // TODO unified: Dramafinder Escape Hatch: playwright.navigate(baseUrl() + "/plan?week=" + plannedMonday)
-        playwright.navigate(baseUrl() + "/plan?week=" + plannedMonday);
+        // when
+        page.navigate("/plan?week=" + plannedPlan.getWeekStartDate());
 
-        // Wait for the badge to confirm the right week loaded
-        // TODO unified: Dramafinder Escape Hatch: // Wait for the badge to confirm the right week loadedassertThat(playwright.locator("#mise-week-badge")).containsText("Week of " + plannedPlan.getWeekStartDate().format(WEEK_FMT))
-        assertThat(playwright.locator("#mise-week-badge"))
-                .containsText("Week of " + plannedPlan.getWeekStartDate().format(WEEK_FMT));
+        // then
+        assertThat(weekBadge(page)).hasTextContaining(plannedWeekLabel());
+        assertThat(page.find(UnifiedDiv.class).withTestId("meal-row")).hasCount(7);
+    }
 
-        // Exactly 7 meal rows must be present
-        // TODO unified: Dramafinder Escape Hatch: // Exactly 7 meal rows must be presentassertThat(playwright.getByTestId("meal-row")).hasCount(7)
-        assertThat(playwright.getByTestId("meal-row")).hasCount(7);
+    private static UnifiedButton nextWeekButton(UnifiedPage page) {
+        return page.find(UnifiedButton.class).withAccessibleName("Next week");
+    }
+
+    private static UnifiedSpan weekBadge(UnifiedPage page) {
+        return page.find(UnifiedSpan.class).withId("mise-week-badge");
+    }
+
+    private String plannedWeekLabel() {
+        return "Week of " + plannedPlan.getWeekStartDate().format(WEEK_FMT);
     }
 
     /**
@@ -267,8 +245,8 @@ class GenerateFutureWeeksIT {
      * done in @BeforeEach produced the correct data shape in the database.
      */
     @Test
-    void generatePlannedWeeksCreatesExactlyOnePlanWithSevenMeals(UnifiedPage page) {
-        page.navigate("/plan");
+    @DisplayName("Generating next week creates one planned plan with seven AI-picked meals")
+    void generatePlannedWeeksCreatesExactlyOnePlanWithSevenMeals() {
         // The planned plan must have status=PLANNED
         var refreshed = planRepository.findById(plannedPlan.getId()).orElseThrow();
         Assertions.assertThat(refreshed.getStatus()).isEqualTo(Plan.Status.PLANNED);

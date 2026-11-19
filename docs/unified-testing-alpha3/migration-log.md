@@ -323,3 +323,15 @@ How the executions are set up:
 - `OnboardingRedirectIT`: `assertThat(playwright).hasURL(".*/plan.*")` → `assertThat(page).isAt(PlanView.class)`. It now runs everywhere. I also fixed the class Javadoc, which still described the `setupTest()` override.
 - `HomeViewIT`: the header and the stored-message count now use `page.findComponent(H2.class).withText(..)` / `page.find(UnifiedSpan.class).withTextContaining(..)` and run everywhere. The page-title check stays `// Escape Hatch kept: the Unified API has no page-title assertion` (F21).
 - **Result:** Playwright 4/4. Browserless 3/3, with the title test skipped.
+
+### 7c: GenerateFutureWeeksIT
+
+- All 12 markers resolved, so every test runs everywhere and none needs `@RequiresTestingTool`:
+  - The week chevrons use `find(UnifiedButton.class).withAccessibleName("Next week")`, their `aria-label`, which is what a screen-reader user hears.
+  - The badge uses `find(UnifiedSpan.class).withId("mise-week-badge")`.
+  - Meal rows use `find(UnifiedDiv.class).withTestId("meal-row")` with `hasCount(7)`.
+  - The future-week modifier is checked with `assertThat(badge.withClassName("mise-week-badge--future")).exists()`.
+  - The disabled check is `isEnabled()`, where the old test checked `disabled` / `aria-disabled` attributes separately.
+- `playwright.navigate(baseUrl() + "/plan?week=…")` → `page.navigate("/plan?week=…")`. The query string works on Browserless too, and the `@LocalServerPort` helper added in step 5 is gone.
+- The repository-only test lost its `UnifiedPage` parameter and its pointless `navigate`.
+- **Result:** Playwright 5/5, Browserless 5/5.
