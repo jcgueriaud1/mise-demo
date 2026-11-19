@@ -23,8 +23,12 @@ public interface UnifiedMessageInput extends UnifiedWrapper, CommonFilters<Unifi
         element().findDescendants("vaadin-message-input-button").getFirst().click();
     }
 
-    /** Puts the focus in the input (the dock expands on :focus-within). */
+    /**
+     * Puts the focus in the input (the dock expands on :focus-within). Focuses the slotted native
+     * {@code <textarea>}: neither the {@code vaadin-message-input} host nor its {@code vaadin-text-area} takes
+     * focus from a generic element, so focusing them leaves :focus-within unmatched.
+     */
     default void focus() {
-        element().focus();
+        element().findDescendants("textarea").getFirst().focus();
     }
 }

@@ -210,7 +210,18 @@ The "Running on the other Testing Tools" section of the migration guide mentions
 | F22 | API | no grid column-header assertion | medium | #359 |
 | F23 | API | `UnifiedDiv` / `UnifiedSpan` have no `click()` | medium | #358 |
 | F24 | behaviour | Browserless passes CSS-hidden inputs (documented, worth a louder note) | low | #367 |
+| F25 | recipe / API | path navigation for a static `getView()`; no Class + query-parameters `navigate` | low | #370 |
+| F26 | archunit | the `tryUnwrap(..)` exemption doesn't reach helper methods | low | not filed |
+| F27 | API | `findDescendants(..)` elements lose DramaFinder focus handling; `focus()` silently does nothing | medium | not filed |
 
 ### F25: The recipe emits a path for a static `getView()`, and there is no Class + query-parameters `navigate`. Verified · [#370](https://github.com/parttio/unified-testing-tool/issues/370)
 
 The recipe turns `getView()` returning `"/plan"` into `page.navigate("/plan")`. When the literal resolves to exactly one `@Route`, `page.navigate(PlanView.class)` is the canonical form: it fails at compile time on a route rename, and its report reads `open Plan` rather than `open “/plan”`. In Mise, 72 of 76 navigations were moved to the class form by hand. The remaining 4 carry `?week=…`, and `UnifiedPage` has no `navigate(Class, QueryParameters)`.
+
+### F26: The style rule's `tryUnwrap(..)` exemption doesn't reach helper methods. Verified · not filed yet
+
+`TOOL_CODE_NEEDS_CAPABILITY` lets "a code unit that calls `tryUnwrap(..)`" use the Testing Tool types it unwraps, with no `@RequiresTestingTool`. That covers the lambda passed to `ifPresent(..)`. It does not cover a private helper the lambda calls. In `ChatDockIT`, `page.tryUnwrap(Page.class).ifPresent(pw -> … previewShown(pw.getByTestId(..)))` with `private static boolean previewShown(Locator dock)` fails: "has com.microsoft.playwright.Locator in ChatDockIT.previewShown(Locator) without @RequiresTestingTool". The rule's own fix hint ("use tryUnwrap(..) for a check that runs everywhere") is what the test already does. The workaround is to inline the helper code into the lambda. The rule could follow calls from a `tryUnwrap` code unit the same way it already follows them from a test.
+
+### F27: Elements from `findDescendants(..)` lose DramaFinder's focus handling. Verified · not filed yet
+
+`PlaywrightElement.focus()` uses DramaFinder's `FocusableElement` (a field's inner input) when it has one, and otherwise `Locator.focus()` on the host. `findDescendants(tag)` wraps every match with `dramafinder = null`. So in a custom Wrapper, `element().focus()` on `vaadin-message-input` and `element().findDescendants("vaadin-text-area").getFirst().focus()` both leave focus on the page: no error, and `:focus-within` never matches. Only `findDescendants("textarea")`, the slotted native input, works. A custom Wrapper for a field-like component (`@UnifiedComponent(MessageInput.class, …)`) has no way to opt into the field focus handling. Either map the descendant's tag to its DramaFinder element, or let `@UnifiedComponent` name the focus target.

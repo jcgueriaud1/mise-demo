@@ -505,3 +505,20 @@ One commit per step on `unified-testing-alpha3` (`git log --oneline dev-main..`)
 The recipe had written `page.navigate("/plan")` from each class's `getView()` string. 72 navigations now use the view class (`PlanView`, `ReportsView`, `ShoppingView`, `OnboardingView`, `HomeView`), which is the canonical form in `write-unified-ui-tests`. A renamed route now breaks at compile time, and the User Steps read `open Plan`. The 4 `/plan?week=…` navigations stay paths, each with a comment, because `UnifiedPage` has no Class + query-parameters overload. That is filed upstream as F25 / [#370](https://github.com/parttio/unified-testing-tool/issues/370).
 
 **Result** (`./mvnw -Pit verify`): unit 194 ✓, Playwright 74/74 ✓, Browserless 66 ✓ + 8 skipped. The two ManualExamples ITs were changed the same way. They compile but weren't run, since they need a live LLM.
+
+## Follow-up: ChatDock tests run on both tools (2026-11-19)
+
+The two ChatDock tests were Playwright-only: `@RequiresTestingTool(PLAYWRIGHT)` around computed-CSS and scroll checks. On Browserless they were skipped, so nothing in them was checked there. They now run on every tool, with the tool-specific parts behind `tryUnwrap(..)`, which is empty on the other tool:
+
+- **`dockExpandsOnFocusAndCollapsesOnBlur`**: the dock, history, preview and input are checked through the Unified API on both tools. The `:focus-within` expand/collapse is a Playwright-only branch, `page.tryUnwrap(Page.class).ifPresent(..)`.
+- **`expandScrollsToLatestMessage`**: the repo's example of a test with a common part plus a part per tool:
+  - Common: the 12 seeded messages are shown, the latest one last.
+  - Browserless only: `history.tryUnwrap(MessageList.class)`, so the server-side `MessageList` holds exactly the persisted conversation.
+  - Playwright only: `page.tryUnwrap(Page.class)`, so re-expanding the dock scrolls the history to the bottom.
+
+Along the way:
+- `UnifiedMessageInput.focus()` didn't focus anything on Playwright, and nothing had called it before. It now focuses the slotted `<textarea>` (F27).
+- The Playwright helper methods had to be inlined into the `tryUnwrap` lambdas to satisfy the style rule (F26).
+- A negative check confirmed the Browserless branch runs: a deliberately wrong expected size failed it.
+
+**Result** (`./mvnw -Pit verify -Dit.test=ChatDockIT` + `UnifiedStyleTest`): Playwright 3/3 ✓, Browserless 3/3 ✓ (was 1 + 2 skipped), style ✓.
