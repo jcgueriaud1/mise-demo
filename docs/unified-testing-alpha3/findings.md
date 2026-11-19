@@ -156,3 +156,8 @@ That happens 24 times in Mise. It hurts the markers' readability and breaks a `g
 
 On its first Browserless run, a migrated test failed with `CancellableLLMProvider is already in use by another AIOrchestrator`. The cause was `OnboardingView.beforeEnter()` building a new `AIOrchestrator` each time the *same* view instance was re-entered. Browserless starts at `""` (which forwards to `/welcome`), and the test's `navigate("/welcome")` re-enters that instance. In a browser every navigation is a page load and a new instance, so the bug never shows there, but a user navigating within the app could hit it. The Unified failure message (`Error text: There was an exception while trying to navigate to 'welcome' …`) plus the server log made it quick to find.
 **Suggestion:** the "Running on the other Testing Tools" section could mention that Browserless's first navigation lands on `""`, and that a later `navigate(..)` to the current route reuses the view instance.
+
+### F21: No page-title assertion. Verified
+
+`@PageTitle` is ordinary Flow behaviour (the browser tab title), and it is available on every tool: `document.title` in a browser, `UI.getInternals().getTitle()` on Browserless. But `PageAssert` has only `isAt`, `hasPath` and `hasQueryParameter`, so a title check stays Playwright-only behind the Escape Hatch.
+**Suggestion:** `assertThat(page).hasTitle(..)`.

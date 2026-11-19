@@ -6,11 +6,14 @@ import com.vaadin.testing.unified.RequiresTestingTool;
 import com.vaadin.testing.unified.TestingTool;
 import com.vaadin.testing.unified.UnifiedPage;
 import com.vaadin.testing.unified.spring.UnifiedSpringBootTest;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import com.vaadin.flow.component.html.H2;
+import com.vaadin.testing.unified.component.UnifiedSpan;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 
-import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
+import static com.vaadin.testing.unified.assertion.UnifiedAssertions.assertThat;
 
 /**
  * Pilot Playwright IT — validates the IT toolchain (Spring Boot + Playwright + DramaFinder)
@@ -23,32 +26,26 @@ import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertTha
 class HomeViewIT {
 
     @Test
+    @DisplayName("The debug page has its browser tab title")
     @RequiresTestingTool(TestingTool.PLAYWRIGHT)
     void hasPageTitle(UnifiedPage page) {
+        // Escape Hatch kept: the Unified API has no page-title assertion
         Page playwright = page.unwrap(Page.class);
         page.navigate("/debug");
-        // TODO unified: Dramafinder Escape Hatch: assertThat(playwright).hasTitle("Mise — Debug")
-        assertThat(playwright).hasTitle("Mise — Debug");
+        com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat(playwright).hasTitle("Mise — Debug");
     }
 
     @Test
-    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    @DisplayName("The debug page shows the build stage header")
     void rendersStageHeader(UnifiedPage page) {
-        Page playwright = page.unwrap(Page.class);
         page.navigate("/debug");
-        // TODO unified: Dramafinder Escape Hatch: assertThat(playwright.getByRole(com.microsoft.playwright.options.AriaRole.HEADING).filter(new com.microsoft.playwright.Locator.FilterOptions().setHasText("Mise — prep build (stage 2)"))).isVisible()
-        assertThat(playwright.getByRole(com.microsoft.playwright.options.AriaRole.HEADING)
-                .filter(new com.microsoft.playwright.Locator.FilterOptions()
-                        .setHasText("Mise — prep build (stage 2)")))
-                .isVisible();
+        assertThat(page.findComponent(H2.class).withText("Mise — prep build (stage 2)")).isVisible();
     }
 
     @Test
-    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    @DisplayName("The debug page shows how many chat messages are stored")
     void showsStoredMessageCount(UnifiedPage page) {
-        Page playwright = page.unwrap(Page.class);
         page.navigate("/debug");
-        // TODO unified: Dramafinder Escape Hatch: assertThat(playwright.getByText("Stored messages:")).isVisible()
-        assertThat(playwright.getByText("Stored messages:")).isVisible();
+        assertThat(page.find(UnifiedSpan.class).withTextContaining("Stored messages:")).isVisible();
     }
 }

@@ -317,3 +317,9 @@ How the executions are set up:
      2  send “Two adults, no fish, around €90 a week” with message input
      … 1 call outside the Unified API (waitUntil)
   ```
+
+### 7b: OnboardingRedirectIT, HomeViewIT
+
+- `OnboardingRedirectIT`: `assertThat(playwright).hasURL(".*/plan.*")` → `assertThat(page).isAt(PlanView.class)`. It now runs everywhere. I also fixed the class Javadoc, which still described the `setupTest()` override.
+- `HomeViewIT`: the header and the stored-message count now use `page.findComponent(H2.class).withText(..)` / `page.find(UnifiedSpan.class).withTextContaining(..)` and run everywhere. The page-title check stays `// Escape Hatch kept: the Unified API has no page-title assertion` (F21).
+- **Result:** Playwright 4/4. Browserless 3/3, with the title test skipped.
