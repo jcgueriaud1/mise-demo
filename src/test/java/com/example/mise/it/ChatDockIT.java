@@ -21,7 +21,10 @@ import com.example.mise.domain.plan.PlanService;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import com.example.mise.it.support.wrappers.UnifiedMessageInput;
+import com.vaadin.testing.unified.component.UnifiedContainer;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.vaadin.addons.dramafinder.element.MessageInputElement;
 
@@ -34,6 +37,7 @@ import java.util.concurrent.CountDownLatch;
 import org.assertj.core.api.Assertions;
 
 import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
+import static com.vaadin.testing.unified.assertion.UnifiedAssertions.assertThat;
 
 /**
  * UC-008 chat-dock interaction model — covers BR-08 (two-state dock), BR-09
@@ -121,64 +125,55 @@ class ChatDockIT {
      * preview visible); focused = expanded (max-height > 0, preview hidden).
      */
     @Test
+    @DisplayName("The chat dock expands while the input has focus and collapses after")
     @RequiresTestingTool(TestingTool.PLAYWRIGHT)
     void dockExpandsOnFocusAndCollapsesOnBlur(UnifiedPage page) {
+        // Escape Hatch kept: computed CSS (max-height transition, preview display) on :focus-within needs a real browser
         Page playwright = page.unwrap(Page.class);
         page.navigate("/plan");
-        // TODO unified: Dramafinder Escape Hatch: playwright.getByTestId("chat-dock")
         var chatDock = playwright.getByTestId("chat-dock");
-        // TODO unified: Dramafinder Escape Hatch: assertThat(chatDock).isVisible()
         assertThat(chatDock).isVisible();
 
         // Initially collapsed: chat-history max-height is 0, preview shown.
         // parseFloat() of "0px" yields a whole number — Playwright marshals it as
         // Integer; non-whole values come back as Double. Cast through Number.
-        // TODO unified: Dramafinder Escape Hatch: chatDock.evaluate("d => parseFloat(getComputedStyle(d.querySelector('.mise-chat-history')).maxHeight)")
         double initialHeight = ((Number) chatDock.evaluate(
                 "d => parseFloat(getComputedStyle(d.querySelector('.mise-chat-history')).maxHeight)"
         )).doubleValue();
         Assertions.assertThat(initialHeight).as("collapsed max-height").isLessThanOrEqualTo(1.0);
 
-        // TODO unified: Dramafinder Escape Hatch: chatDock.evaluate("d => getComputedStyle(d.querySelector('.mise-last-ai-message')).display !== 'none'")
         Boolean previewVisibleBefore = (Boolean) chatDock.evaluate(
                 "d => getComputedStyle(d.querySelector('.mise-last-ai-message')).display !== 'none'"
         );
         Assertions.assertThat(previewVisibleBefore).as("preview visible when collapsed").isTrue();
 
         // Focus the input → expand.
-        // TODO unified: Dramafinder Escape Hatch: // Focus the input → expand.MessageInputElement.get(chatDock).focus()
         MessageInputElement.get(chatDock).focus();
 
         // Auto-wait for the focus-within style to land via Playwright's polling
         // assertion; max-height transitions over ~180 ms.
-        // TODO unified: Dramafinder Escape Hatch: // Auto-wait for the focus-within style to land via Playwright's polling// assertion; max-height transitions over ~180 ms.playwright.waitForFunction("d => parseFloat(getComputedStyle(d.querySelector('.mise-chat-history')).maxHeight) > 100",chatDock.elementHandle())
         playwright.waitForFunction(
                 "d => parseFloat(getComputedStyle(d.querySelector('.mise-chat-history')).maxHeight) > 100",
                 chatDock.elementHandle()
         );
 
-        // TODO unified: Dramafinder Escape Hatch: chatDock.evaluate("d => parseFloat(getComputedStyle(d.querySelector('.mise-chat-history')).maxHeight)")
         double expandedHeight = ((Number) chatDock.evaluate(
                 "d => parseFloat(getComputedStyle(d.querySelector('.mise-chat-history')).maxHeight)"
         )).doubleValue();
         Assertions.assertThat(expandedHeight).as("expanded max-height").isGreaterThan(100.0);
 
-        // TODO unified: Dramafinder Escape Hatch: chatDock.evaluate("d => getComputedStyle(d.querySelector('.mise-last-ai-message')).display !== 'none'")
         Boolean previewVisibleAfter = (Boolean) chatDock.evaluate(
                 "d => getComputedStyle(d.querySelector('.mise-last-ai-message')).display !== 'none'"
         );
         Assertions.assertThat(previewVisibleAfter).as("preview hidden when expanded").isFalse();
 
         // Blur by clicking outside the dock (the meal grid is a safe target).
-        // TODO unified: Dramafinder Escape Hatch: // Blur by clicking outside the dock (the meal grid is a safe target).playwright.getByTestId("kpi-strip").click()
         playwright.getByTestId("kpi-strip").click();
-        // TODO unified: Dramafinder Escape Hatch: playwright.waitForFunction("d => parseFloat(getComputedStyle(d.querySelector('.mise-chat-history')).maxHeight) <= 1",chatDock.elementHandle())
         playwright.waitForFunction(
                 "d => parseFloat(getComputedStyle(d.querySelector('.mise-chat-history')).maxHeight) <= 1",
                 chatDock.elementHandle()
         );
 
-        // TODO unified: Dramafinder Escape Hatch: chatDock.evaluate("d => getComputedStyle(d.querySelector('.mise-last-ai-message')).display !== 'none'")
         Boolean previewVisibleAfterBlur = (Boolean) chatDock.evaluate(
                 "d => getComputedStyle(d.querySelector('.mise-last-ai-message')).display !== 'none'"
         );
@@ -191,42 +186,35 @@ class ChatDockIT {
      * it was before.
      */
     @Test
+    @DisplayName("Expanding the chat dock scrolls to the latest message")
     @RequiresTestingTool(TestingTool.PLAYWRIGHT)
     void expandScrollsToLatestMessage(UnifiedPage page) {
+        // Escape Hatch kept: scroll position after a CSS transition needs a real browser
         Page playwright = page.unwrap(Page.class);
         page.navigate("/plan");
-        // TODO unified: Dramafinder Escape Hatch: playwright.getByTestId("chat-dock")
         var chatDock = playwright.getByTestId("chat-dock");
-        // TODO unified: Dramafinder Escape Hatch: MessageInputElement.get(chatDock)
         MessageInputElement input = MessageInputElement.get(chatDock);
 
         // Open the dock, scroll to the TOP of the history programmatically, then
         // re-focus and assert it landed at the bottom.
-        // TODO unified: Dramafinder Escape Hatch: // Open the dock, scroll to the TOP of the history programmatically, then// re-focus and assert it landed at the bottom.input.focus()
         input.focus();
-        // TODO unified: Dramafinder Escape Hatch: playwright.waitForFunction("d => parseFloat(getComputedStyle(d.querySelector('.mise-chat-history')).maxHeight) > 100",chatDock.elementHandle())
         playwright.waitForFunction(
                 "d => parseFloat(getComputedStyle(d.querySelector('.mise-chat-history')).maxHeight) > 100",
                 chatDock.elementHandle()
         );
 
-        // TODO unified: Dramafinder Escape Hatch: chatDock.evaluate("d => { d.querySelector('.mise-chat-history').scrollTop = 0; }")
         chatDock.evaluate("d => { d.querySelector('.mise-chat-history').scrollTop = 0; }");
 
         // Blur the input, re-focus to trigger the focusin handler again.
-        // TODO unified: Dramafinder Escape Hatch: // Blur the input, re-focus to trigger the focusin handler again.playwright.getByTestId("kpi-strip").click()
         playwright.getByTestId("kpi-strip").click();
-        // TODO unified: Dramafinder Escape Hatch: playwright.waitForFunction("d => parseFloat(getComputedStyle(d.querySelector('.mise-chat-history')).maxHeight) <= 1",chatDock.elementHandle())
         playwright.waitForFunction(
                 "d => parseFloat(getComputedStyle(d.querySelector('.mise-chat-history')).maxHeight) <= 1",
                 chatDock.elementHandle()
         );
-        // TODO unified: Dramafinder Escape Hatch: input.focus()
         input.focus();
 
         // Wait for the transitionend-driven scroll to land. transitionend fires
         // once the 180ms max-height transition completes; allow ~500ms buffer.
-        // TODO unified: Dramafinder Escape Hatch: // Wait for the transitionend-driven scroll to land. transitionend fires// once the 180ms max-height transition completes; allow ~500ms buffer.playwright.waitForFunction("d => { const h = d.querySelector('.mise-chat-history');"+ "      return h.scrollHeight - (h.scrollTop + h.clientHeight) < 5; }",chatDock.elementHandle())
         playwright.waitForFunction(
                 "d => { const h = d.querySelector('.mise-chat-history');"
                 + "      return h.scrollHeight - (h.scrollTop + h.clientHeight) < 5; }",
@@ -234,7 +222,6 @@ class ChatDockIT {
         );
 
         // Final assertion — confirm we're at the bottom.
-        // TODO unified: Dramafinder Escape Hatch: chatDock.evaluate("d => { const h = d.querySelector('.mise-chat-history');"+ "      return h.scrollHeight - (h.scrollTop + h.clientHeight) < 5; }")
         Boolean atBottom = (Boolean) chatDock.evaluate(
                 "d => { const h = d.querySelector('.mise-chat-history');"
                 + "      return h.scrollHeight - (h.scrollTop + h.clientHeight) < 5; }"
@@ -248,49 +235,24 @@ class ChatDockIT {
      * the pause-latch), the class is removed.
      */
     @Test
-    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    @DisplayName("The chat dock shows it is working while the assistant answers")
     void aiWorkingClassToggledAroundSubmit(UnifiedPage page) throws Exception {
-        Page playwright = page.unwrap(Page.class);
+        // given: the assistant's answer is held back until the latch is released
         page.navigate("/plan");
         CountDownLatch responseLatch = chatModel.pauseNextResponse();
         chatModel.queueReply("Sure — Thursday is Roasted Vegetable Pasta.");
+        UnifiedContainer chatDock = page.find(UnifiedContainer.class).withTestId("chat-dock");
 
-        // TODO unified: Dramafinder Escape Hatch: playwright.getByTestId("chat-dock")
-        var chatDock = playwright.getByTestId("chat-dock");
-        // TODO unified: Dramafinder Escape Hatch: MessageInputElement.get(chatDock)
-        MessageInputElement input = MessageInputElement.get(chatDock);
-        // TODO unified: Dramafinder Escape Hatch: input.typeAndSubmit("Swap Thursday for something vegetarian.")
-        input.typeAndSubmit("Swap Thursday for something vegetarian.");
+        // when
+        chatDock.find(UnifiedMessageInput.class).send("Swap Thursday for something vegetarian.");
 
-        // After submit, the submit-listener on the UI thread adds .ai-working.
-        // Wait for the class to appear (auto-polled, up to default timeout).
-        // TODO unified: Dramafinder Escape Hatch: // After submit, the submit-listener on the UI thread adds .ai-working.// Wait for the class to appear (auto-polled, up to default timeout).playwright.waitForFunction("d => d.classList.contains('ai-working')",chatDock.elementHandle())
-        playwright.waitForFunction(
-                "d => d.classList.contains('ai-working')",
-                chatDock.elementHandle()
-        );
+        // then: the submit listener marks the dock as working
+        assertThat(chatDock.withClassName("ai-working")).exists();
 
-        // TODO unified: Dramafinder Escape Hatch: chatDock.evaluate("d => d.classList.contains('ai-working')")
-        Boolean hasWorkingDuring = (Boolean) chatDock.evaluate(
-                "d => d.classList.contains('ai-working')"
-        );
-        Assertions.assertThat(hasWorkingDuring).as(".ai-working set while streaming").isTrue();
-
-        // Release the streaming pause so the responseCompleteListener can fire.
+        // when: the response completes
         responseLatch.countDown();
 
-        // Wait for class removal once response-complete clears it (wrapped in
-        // ui.access — round-trip via the streaming thread + UI push).
-        // TODO unified: Dramafinder Escape Hatch: // Wait for class removal once response-complete clears it (wrapped in// ui.access — round-trip via the streaming thread + UI push).playwright.waitForFunction("d => !d.classList.contains('ai-working')",chatDock.elementHandle())
-        playwright.waitForFunction(
-                "d => !d.classList.contains('ai-working')",
-                chatDock.elementHandle()
-        );
-
-        // TODO unified: Dramafinder Escape Hatch: chatDock.evaluate("d => d.classList.contains('ai-working')")
-        Boolean hasWorkingAfter = (Boolean) chatDock.evaluate(
-                "d => d.classList.contains('ai-working')"
-        );
-        Assertions.assertThat(hasWorkingAfter).as(".ai-working cleared after response complete").isFalse();
+        // then: the response-complete listener clears it (ui.access + push)
+        assertThat(chatDock.withClassName("ai-working")).doesNotExist();
     }
 }

@@ -345,3 +345,17 @@ How the executions are set up:
   - The `navigate(baseUrl()+"/reports")` reloads became `page.reload()`, which also says what the test means.
 - Kept: the page-title Escape Hatch (F21).
 - **Result:** Playwright 11/11, Browserless 10/10 (title test skipped). The charts and the grid all run on Browserless as server-side components.
+
+### 7e: ChatDockIT, ChatBusyStopIT
+
+- **ChatBusyStopIT:** all 27 markers resolved, and all 3 tests now run everywhere.
+  - The `waitForFunction("d => d.classList.contains('ai-working')")` polls became `assertThat(chatDock.withClassName("ai-working")).exists()` / `.doesNotExist()`.
+  - The busy note (server-side `setVisible`/`setText`) is checked with `assertThat(span).isVisible()` / `hasTextContaining(..)` / `isHidden()`.
+  - The `document.querySelectorAll('vaadin-message')` scans use `UnifiedMessageList.getMessageTexts()`.
+  - The stop / cancel / "(stopped)" flow, with a background streaming thread, `ui.access` and push, passes on Browserless too.
+- **ChatDockIT:**
+  - `aiWorkingClassToggledAroundSubmit` is converted and runs everywhere.
+  - Kept, with a reason: `dockExpandsOnFocusAndCollapsesOnBlur` (computed `max-height` and `display` under `:focus-within`) and `expandScrollsToLatestMessage` (scroll position after a CSS transition). They need a real browser and stay `@RequiresTestingTool(PLAYWRIGHT)`. Their markers were replaced by one `// Escape Hatch kept: …` line each.
+- **Result:**
+  - ChatBusyStopIT: Playwright 3/3, Browserless 3/3.
+  - ChatDockIT: Playwright 3/3, Browserless 1/1 (2 skipped).
