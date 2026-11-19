@@ -21,10 +21,11 @@ Mise — a weekly meal planner that demonstrates a deeply AI-integrated Vaadin a
 ```bash
 ./mvnw                            # Run in dev mode (default goal: spring-boot:run)
 ./mvnw clean package              # Production build (JAR in target/)
-./mvnw test                       # Run unit + Browserless tests
+./mvnw test                       # Run unit + Browserless tests (+ UnifiedStyleTest)
 ./mvnw test -Dtest=ClassName      # Run a single test class
-./mvnw -Pit verify                # Run *IT.java Playwright browser tests (opt-in)
-./mvnw -Pit verify -Dit.test=X    # Run a single IT class
+./mvnw -Pit verify                # Run *IT.java UI tests on Playwright AND Browserless (opt-in)
+./mvnw -Pit verify -Dit.test=X    # Run a single IT class (both tools)
+./mvnw -Pit verify -Dskip.it.browserless=true   # Playwright only (or -Dskip.it.playwright=true)
 ./mvnw -Pai-it verify             # Run *AIIT.java against the live LLM (2-fork parallel; opt-in)
 ./mvnw -Pai-it verify -Dit.test=X # Run a single AIIT class
 ```
@@ -33,8 +34,10 @@ The app runs on port 8080 (configurable via `PORT` env var). For the LLM endpoin
 
 There are three test layers, each with its own purpose:
 
-- **Unit + Browserless** (`./mvnw test`) — fast in-JVM tests. Unit tests live under their domain packages; Browserless tests use Vaadin's [`browserless-test-spring`](https://vaadin.com/docs/latest/flow/testing/browserless/getting-started) under `src/test/java/com/example/mise/browserless/` and assert on the live Vaadin component tree without a Chromium browser. Browserless is the right tool for click-handler / repository-side-effect tests with no CSS / layout concerns.
-- **Playwright IT** (`./mvnw -Pit verify`) — real Chromium via [Microsoft Playwright](https://playwright.dev/java/) with [DramaFinder](https://github.com/parttio/dramafinder) wrappers for Vaadin locators. Headless by default. Lives under `src/test/java/com/example/mise/it/` and uses an in-memory H2 (`application-it.properties`). First run rebuilds the Vaadin frontend bundle (3–5 min); subsequent runs are ~25 s. Reach for it when CSS / layout / rendering / responsive breakpoints matter.
+UI tests are **Unified UI Tests** ([unified-testing-tool](https://github.com/parttio/unified-testing-tool), `org.vaadin.addons:unified-test-*` 0.1.0-alpha3, versions from `unified-test-bom`): one test source, written against `UnifiedPage` and `Unified*` Wrappers, that runs on **Browserless** (in-JVM, the default) or **Playwright** (real Chromium) depending on `vaadin.testing.tool`. Write and change them by the `write-unified-ui-tests` skill (`.claude/skills/write-unified-ui-tests/SKILL.md`). Migration history and the library issues found: [`docs/unified-testing-alpha3/`](docs/unified-testing-alpha3/).
+
+- **Unit + Browserless** (`./mvnw test`) — fast in-JVM tests. Unit tests live under their domain packages; `src/test/java/com/example/mise/browserless/` holds Unified UI Tests that run on Browserless here (and on Playwright with `-Dvaadin.testing.tool=playwright`). `UnifiedStyleTest` checks the Unified style rules (a `@DisplayName` sentence per test, no raw waits, tool-specific code only behind `@RequiresTestingTool`).
+- **UI IT** (`./mvnw -Pit verify`) — the `*IT.java` Unified UI Tests under `src/test/java/com/example/mise/it/`, run twice by failsafe: `it-playwright` (headless Chromium; `-Pdebug-ui` shows it) and `it-browserless`. Tests that need a real browser (computed CSS, scroll, page title, CSS-hidden inputs) keep a Playwright Escape Hatch with `@RequiresTestingTool(TestingTool.PLAYWRIGHT)` and a `// Escape Hatch kept: <reason>` line, and are skipped on Browserless. Reports, User Steps (`user-steps.txt`), `summary.md` and `report.html` land in `target/failsafe-reports/<tool>/`. In-memory H2 (`application-it.properties`); first run rebuilds the Vaadin frontend bundle (3–5 min). Custom Wrappers for `MessageInput` / `MessageList` (no built-in ones in alpha3) are in `it/support/wrappers/`.
 - **AI Tool IT** (`./mvnw -Pai-it verify`) — `*AIIT.java` under `src/test/java/com/example/mise/aiit/` that drive the production tool beans + system prompt through Spring AI's `ChatClient` against the **live LLM** endpoint. No Playwright, no dev server; each test seeds its own household + active plan in an in-memory H2 (`application-ai-it.properties`). Two failsafe forks run in parallel — match this with a model endpoint that advertises a `parallel-2` slot (the default Qwen-local model does). Use for tool-invocation correctness, no-fabrication checks, BR clarification rules, and reply tone / length — anything that's about the model's behaviour against real tool descriptions, not about UI integration.
 
 > **Don't run two test layers (separate Maven/JVM processes) at the same time.** The `verify` lifecycle for `-Pit` and `-Pai-it` re-runs the unit/Browserless suite in its surefire phase, and those `@SpringBootTest`s hit the **file** H2 at `./data/mise` (`AUTO_SERVER=TRUE`, shared across JVMs). Two concurrent builds collide on that shared DB and one tears the session out from under the other — surfacing as spurious `Connection is broken: "session closed"` / `Database is already closed` errors (typically in `PlanServiceUC011Test`), not real failures. Run the layers sequentially. The clean fix is to put the unit `@SpringBootTest`s on an in-memory H2 like the IT/AIIT profiles already use — tracked as a future optimization, not done yet.
@@ -55,7 +58,8 @@ The project ships custom skills under [`.claude/skills/`](.claude/skills/) — i
 
 - **`implement-uc`** — orchestrates use-case implementation via subagents (impl, visual verify, AI verify) with file-based progress tracking.
 - **`spec-*`** — `spec-status`, `spec-validate`, `spec-architect`, `spec-interview`, `spec-generate` for working with the spec tree.
-- **`vaadin-playwright-test`** — generates `*IT.java` tests for a Vaadin view using DramaFinder element wrappers. Triggers on "write an IT test for X", "DramaFinder", "Playwright test". Vendored from [parttio/dramafinder](https://github.com/parttio/dramafinder) under Apache 2.
+- **`write-unified-ui-tests`** — how to write, change or fix Unified UI Tests (installed by the unified-test migration recipe). Use this for new UI tests.
+- **`vaadin-playwright-test`** — *superseded by `write-unified-ui-tests`*: generates DramaFinder-based `*IT.java` tests, the pre-migration style. Triggers on "write an IT test for X", "DramaFinder", "Playwright test". Vendored from [parttio/dramafinder](https://github.com/parttio/dramafinder) under Apache 2.
 
 ## Project agent memory
 

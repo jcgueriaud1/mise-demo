@@ -1,9 +1,11 @@
 ---
 name: vaadin-playwright-test
-description: Generate Playwright integration tests for Vaadin 25 views using the DramaFinder library, including element interaction, form validation, grid assertions, and navigation checks. Use when the user wants to write IT tests for a Vaadin view, mentions DramaFinder, or asks about Playwright testing in a Vaadin project.
+description: SUPERSEDED in this project by write-unified-ui-tests (the UI tests are Unified UI Tests since the unified-test 0.1.0-alpha3 migration). Use only when the user explicitly asks for a raw DramaFinder/Playwright test or for DramaFinder element details behind a Playwright Escape Hatch.
 ---
 
 # Vaadin Playwright Test Generator (DramaFinder)
+
+> **Superseded in Mise.** UI tests are Unified UI Tests now: write them by `.claude/skills/write-unified-ui-tests/SKILL.md`. This skill stays for DramaFinder details used behind a Playwright Escape Hatch.
 
 ## Best practices
 

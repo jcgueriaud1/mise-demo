@@ -17,7 +17,7 @@ Issues found along the way: [`findings.md`](findings.md)
 | 6 | Configure the test layers (Playwright + Browserless) | **Done**: -Pit runs both tools; PW 74 ✓, BL 2 ✓ + 72 skipped |
 | 7 | Resolve the Migration Markers | **Done** except 2 live-LLM ITs (9 markers open), sub-steps 7a–7i |
 | 8 | Add the `UnifiedStyleTest` (ArchUnit style rules) | **Done**: green, live-LLM ITs excluded |
-| 9 | Update CLAUDE.md, skills, memory, spec | Not started |
+| 9 | Update CLAUDE.md, skills, memory, spec | **Done**, except `spec/architecture.md` (needs approval; text proposed below) |
 | 10 | Full verification across all three layers | Not started |
 
 Convention: **one commit per step**, message `unified-testing: step N, <what>`. Each commit appends its entry below and any new issue to `findings.md`.
@@ -437,3 +437,24 @@ How the executions are set up:
   - 1 raw wait: `Thread.sleep` in `ManualExamplesReportsIT.pollForAnyPref`, a DB poll of up to 300 s for a live model's turn.
   - The two live-LLM release-gate classes are excluded from the check, with a comment pointing at the step 7 open item, until they can be migrated against a live endpoint.
 - **Result:** `./mvnw test` gives **194 tests, 0 failures**, including the style test.
+
+---
+
+## Step 9: Docs, skills, memory (2026-11-19)
+
+- **`CLAUDE.md`:**
+  - Build commands: `-Pit` now runs both tools, and `-Dskip.it.<tool>=true` skips one.
+  - The test-layer description now covers Unified UI Tests, the two failsafe executions, Escape Hatch conventions and where the evidence lands.
+  - The skills list adds `write-unified-ui-tests` and marks `vaadin-playwright-test` as superseded.
+  - This also closes F15 for Claude Code, which reads `CLAUDE.md` rather than `AGENTS.md`.
+- **`README.md`:** the integration-test section and the third-party list.
+- **`NOTICE.md`:** adds the Unified Testing Tool (Apache 2.0). DramaFinder is now marked as transitive.
+- **`.claude/skills/implement-uc/SKILL.md`:** the Phase 1.5 IT generator writes Unified UI Tests by `write-unified-ui-tests`. Without that change it would have told agents to extend the deleted `MisePlaywrightIT`. The Browserless-vs-Playwright section is rewritten for "one test, both tools".
+- **`.claude/skills/vaadin-playwright-test/SKILL.md`:** the description no longer triggers on "write an IT test", and a superseded banner was added. It is kept for DramaFinder details behind Escape Hatches.
+- **`.claude/memory/`:** new `reference_unified_testing.md` with the gotchas. The two DramaFinder notes are marked pre-migration, and the Vaadin AI version note covers 25.3. The `MEMORY.md` index is updated.
+
+**Not changed, needs your approval** (`spec/architecture.md` is on the CLAUDE.md "ask first" list). Proposed edits:
+- Line 13: "**Vaadin Flow 25.2** … Currently `25.2.0`" → "**Vaadin Flow 25.3** … Currently `25.3.5`". In the AI preview sentence, the artifact is now `vaadin-ai-core-flow` / `vaadin-ai-extensions-flow`.
+- Line 25: the Spring AI pin list gains "25.3.x → 2.0.1", and "check `vaadin-ai-components-flow`'s POM" becomes "check `vaadin-ai-core-flow`'s POM".
+- Lines 39–41, test stack, replaced by:
+  > - **Unified Testing Tool** (`org.vaadin.addons:unified-test-*`, test scope, versions from `unified-test-bom`) — UI tests are Unified UI Tests: one source, run on **Browserless** (in-JVM, default) and **Playwright** (real headless Chromium). `*IT.java` under `src/test/java/com/example/mise/it/` are `@UnifiedSpringBootTest` + `@ActiveProfiles("it")` + `@Import(TestAiConfig.class)` and take a `UnifiedPage`; `-Pit` runs them on both tools; tests that need a real browser declare `@RequiresTestingTool(PLAYWRIGHT)`. In-memory H2 via `application-it.properties`; accidental LLM calls fail fast (endpoint `http://127.0.0.1:1`). Style enforced by `UnifiedStyleTest` (unified-test-archunit).
