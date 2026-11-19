@@ -10,8 +10,8 @@ Issues found along the way: [`findings.md`](findings.md)
 |---|---|---|
 | 0 | Research, inventory, plan | **Done** (this commit) |
 | 1 | Bump Vaadin 25.2.6 → 25.3.5 (+ Spring AI realign) | **Done**: unit 193 ✓, IT 74 ✓, AIIT not run (no LLM endpoint) |
-| 2 | Bump DramaFinder 1.2.0 → 2.2.0 | Not started |
-| 3 | Baseline commit before the recipe | Not started |
+| 2 | Bump DramaFinder 1.2.0 → 2.2.0 | **Done**: IT 74 ✓, no code changes |
+| 3 | Baseline commit before the recipe | **Done**: the step 2 commit is the baseline |
 | 4 | Run the OpenRewrite migration recipes | Not started |
 | 5 | Hand-convert the `MisePlaywrightIT` base class, re-run the recipe | Not started |
 | 6 | Configure the test layers (Playwright + Browserless) | Not started |
@@ -162,3 +162,17 @@ Approved by the user ("go ahead with the Vaadin 25.3.5 bump").
 **Not changed (needs approval):** `spec/architecture.md` still says "Vaadin Flow 25.2 … Currently `25.2.0`" and points at `vaadin-ai-components-flow`. CLAUDE.md asks before editing that file.
 
 **How it went:** smooth. The only surprise was the `AIController` signature change. The 25.3 release has it, but nothing in the Spring AI pinning notes would have predicted it.
+
+---
+
+## Step 2: DramaFinder 1.2.0 → 2.2.0 (2026-11-19)
+
+**Changes:** `pom.xml` `dramafinder` 1.2.0 → **2.2.0**, the version `unified-test-bom` 0.1.0-alpha3 pins. No test code changed.
+
+**Results:** test sources compile unchanged. `./mvnw -Pit verify` gives **74 ITs, 0 failures**, and the unit layer gives 193 green.
+
+**How it went:** a non-event. The 1.x → 2.x lookup change ("whole value, fails on several matches") didn't bite because Mise's ITs barely use DramaFinder lookups. They use `MessageInputElement.get(page)` / `MessageListElement.get(page)` and raw Playwright `locator("#id")`, and neither depends on substring matching.
+
+## Step 3: Baseline
+
+The step 2 commit is the baseline the recipe runs against: Vaadin 25.3.5, DramaFinder 2.2.0, everything green.
