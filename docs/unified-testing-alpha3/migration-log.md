@@ -359,3 +359,16 @@ How the executions are set up:
 - **Result:**
   - ChatBusyStopIT: Playwright 3/3, Browserless 3/3.
   - ChatDockIT: Playwright 3/3, Browserless 1/1 (2 skipped).
+
+### 7f: PlanViewIT
+
+- 58 of 59 markers resolved, so 18 of the 19 tests run everywhere.
+- **Lookups by what the user perceives:**
+  - The per-day buttons use their `aria-label`: `withAccessibleName("Undo Thursday")` / `("Why Friday")`.
+  - A day's row is `find(UnifiedDiv.class).withTestId("meal-row").withAttribute("data-meal-date", date)`, and its edited pill is found *inside* that row.
+  - The pin button per date is `withAttribute("data-pin-date", date)`.
+- **Notifications:** `getByText("Undo applied")` → `assertThat(find(UnifiedNotification.class).withTextContaining(..)).isOpen()`.
+- **Chat:** two private User Tasks, `sendChatMessage(page, ..)` and `waitForChatMessages(page, n)`, built on the Wrappers. The old `input.focus()` calls, which only expanded the dock so the CSS-hidden list became visible, were dropped. The Wrapper reads messages whether or not they are on screen.
+- **Reloads** use `page.reload()`, and a small `aiSwap(day, reason)` helper replaced 6 copies of the same setup.
+- Kept: the page-title Escape Hatch (F21).
+- **Result:** Playwright 19/19, Browserless 18/18 (title test skipped).
