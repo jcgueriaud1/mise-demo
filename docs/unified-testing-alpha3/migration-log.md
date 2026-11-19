@@ -17,7 +17,7 @@ Issues found along the way: [`findings.md`](findings.md)
 | 6 | Configure the test layers (Playwright + Browserless) | **Done**: -Pit runs both tools; PW 74 ✓, BL 2 ✓ + 72 skipped |
 | 7 | Resolve the Migration Markers | **Done** except 2 live-LLM ITs (9 markers open), sub-steps 7a–7i |
 | 8 | Add the `UnifiedStyleTest` (ArchUnit style rules) | **Done**: green, live-LLM ITs excluded |
-| 9 | Update CLAUDE.md, skills, memory, spec | **Done**, except `spec/architecture.md` (needs approval; text proposed below) |
+| 9 | Update CLAUDE.md, skills, memory, spec | **Done** (`spec/architecture.md` applied after approval) |
 | 10 | Full verification across all three layers | **Done**: unit 194 ✓, Playwright 74 ✓, Browserless 66 ✓ + 8 skipped; AIIT not run (no LLM endpoint) |
 
 Convention: **one commit per step**, message `unified-testing: step N, <what>`. Each commit appends its entry below and any new issue to `findings.md`.
@@ -488,7 +488,7 @@ Not run: `./mvnw -Pai-it verify` and `-Pmanual-verify`, because this machine has
 ### Open items
 
 1. **The live-LLM ITs.** `ManualExamplesReportsIT` and `ManualExamplesStopIT` still have 9 Migration Markers. Resolve them with a live endpoint and `-Pmanual-verify`, then remove their exclusion from `UnifiedStyleTest`.
-2. **`spec/architecture.md`.** The proposed edits are in step 9 and need your approval.
+2. ~~**`spec/architecture.md`.**~~ Applied after approval (Vaadin 25.3.5, the AI artifacts, the Spring AI pin list, the Unified test stack and the build commands).
 3. **The AIIT layer.** Run `./mvnw -Pai-it verify` against the live model. The Vaadin 25.3 bump doesn't touch the ChatClient path, but it hasn't been run.
 4. **The `spring-security-core` workaround** (F13) can come out once unified-test-spring fixes the condition.
 5. **Upstream.** The library findings in [`findings.md`](findings.md) are ready to file as issues on parttio/unified-testing-tool.
