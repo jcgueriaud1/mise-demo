@@ -1,7 +1,8 @@
 - [Spring Boot 4 H2 console autoconfig](project_h2_console_autoconfig.md) — Spring Boot 4.0 dropped H2ConsoleAutoConfiguration; register JakartaWebServlet manually
-- [Vaadin 25.2 AI ↔ Spring AI version pinning](project_vaadin_ai_versions.md) — Vaadin AI 25.2.0-alpha5 is pinned to Spring AI 2.0.0-M4; M5/M6 break SpringAILLMProvider; assistant ChatMessage.messageId is null
+- [Vaadin AI ↔ Spring AI version pinning](project_vaadin_ai_versions.md) — Spring AI must match the Vaadin AI artifacts' POM (25.3.5 → 2.0.1; 25.3 moved them to vaadin-ai-core-flow and changed AIController callbacks); assistant ChatMessage.messageId is null
 - [Vaadin Directory Maven repo](reference_vaadin_directory.md) — Vaadin add-ons publish to maven.vaadin.com/vaadin-addons (not Maven Central); check there before declaring an add-on unpublished
-- [DramaFinder add-on](reference_dramafinder.md) — Playwright wrappers for Vaadin (v1.1.0 via Vaadin Directory) + companion `vaadin-playwright-test` Claude skill
+- [Unified Testing Tool](reference_unified_testing.md) — UI tests run on Playwright + Browserless via `unified-test-*` 0.1.0-alpha3; migration gotchas (spring-security-core workaround, custom Message* wrappers, no Div click)
+- [DramaFinder add-on](reference_dramafinder.md) — pre-migration: Playwright wrappers for Vaadin, now transitive under the Unified Playwright adapter + legacy `vaadin-playwright-test` skill
 - [DramaFinder MessageListElement gotcha](reference_dramafinder_messagelistelement.md) — `get(locator)` searches INSIDE the locator; use `new MessageListElement(locator)` when the testid IS the message-list element
 - [Track experiments as GitHub issues](feedback_track_experiments_as_gh_issues.md) — multi-session bake-offs / comparisons live as gh issues (body=spec, comments=per-run results), not committed eval scripts/plans
 - [Capture perf in model comparisons](feedback_capture_perf_in_model_comparisons.md) — always record tok/s + TTFT alongside quality when comparing LLMs; use a fixed perf probe 3× per model

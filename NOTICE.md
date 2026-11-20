@@ -13,7 +13,12 @@ This product includes material from the following third-party projects:
   `src/main/resources/META-INF/resources/icons/tools-kitchen-2.svg`.
   The design mockups under `ai-meal-planner/mise/` also use Tabler outline icons.
 
+- **Unified Testing Tool** — https://github.com/parttio/unified-testing-tool
+  Apache License 2.0. Used as a test dependency (`org.vaadin.addons:unified-test-*`);
+  its migration recipe generated the `write-unified-ui-tests` skill under `.claude/skills/`.
+
 - **DramaFinder** — https://github.com/parttio/dramafinder
   Copyright the DramaFinder contributors, Apache License 2.0.
-  Used as a test dependency, and parts of its documentation are vendored
-  into the `vaadin-playwright-test` skill under `.claude/skills/`.
+  Used as a test dependency (transitively, through the Unified API's Playwright adapter),
+  and parts of its documentation are vendored into the `vaadin-playwright-test` skill
+  under `.claude/skills/`.

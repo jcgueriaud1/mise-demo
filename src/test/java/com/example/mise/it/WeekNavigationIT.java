@@ -1,5 +1,13 @@
 package com.example.mise.it;
 
+import com.example.mise.ui.plan.PlanView;
+import com.example.mise.it.support.TestChatModel;
+import com.vaadin.testing.unified.UnifiedPage;
+import com.vaadin.testing.unified.spring.UnifiedSpringBootTest;
+import com.example.mise.it.support.TestAiConfig;
+
+import org.springframework.context.annotation.Import;
+import org.springframework.test.context.ActiveProfiles;
 import com.example.mise.capabilities.recipes.RecipeCatalog;
 import com.example.mise.domain.conversation.ConversationMessageRepository;
 import com.example.mise.domain.household.Household;
@@ -15,7 +23,15 @@ import com.example.mise.domain.plan.PlanService;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import com.microsoft.playwright.Page;
+import com.vaadin.testing.unified.RequiresTestingTool;
+import com.vaadin.testing.unified.TestingTool;
 import org.junit.jupiter.api.Test;
+import com.vaadin.testing.unified.component.UnifiedButton;
+import com.vaadin.testing.unified.component.UnifiedDatePicker;
+import com.vaadin.testing.unified.component.UnifiedDiv;
+import com.vaadin.testing.unified.component.UnifiedSpan;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import java.math.BigDecimal;
@@ -25,7 +41,7 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.TemporalAdjusters;
 import java.util.List;
 
-import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
+import static com.vaadin.testing.unified.assertion.UnifiedAssertions.assertThat;
 
 /**
  * UC-010 Playwright IT — week navigation header controls (prev / next / badge / DatePicker).
@@ -49,7 +65,19 @@ import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertTha
  * disabled-button and placeholder-label behaviours cannot therefore be asserted at the
  * Playwright IT layer — they are verified at the unit / browserless layer instead.
  */
-class WeekNavigationIT extends MisePlaywrightIT {
+@ActiveProfiles("it")
+@Import(TestAiConfig.class)
+@UnifiedSpringBootTest
+class WeekNavigationIT {
+
+
+    @Autowired
+    TestChatModel chatModel;
+
+    @BeforeEach
+    void resetChatModelBetweenTests() {
+        chatModel.reset();
+    }
 
     private static final DateTimeFormatter WEEK_FMT = DateTimeFormatter.ofPattern("MMM d");
 
@@ -85,22 +113,13 @@ class WeekNavigationIT extends MisePlaywrightIT {
     /** The active plan (today's Monday). */
     private Plan activePlan;
 
-    // ── Lifecycle ─────────────────────────────────────────────────────────────
-
-    @Override
-    public String getView() {
-        return "/plan";
-    }
-
     /**
      * Seeds 3 plans (oldest HISTORICAL, middle HISTORICAL, active ACTIVE) with 7 meals each,
      * then navigates to /plan so the header renders with all three plans present.
      */
-    @Override
     @BeforeEach
-    public void setupTest() throws Exception {
+    void seedBeforeNavigation() throws Exception {
         seedHousehold();
-        super.setupTest();   // navigates to /plan
     }
 
     @AfterEach
@@ -168,253 +187,249 @@ class WeekNavigationIT extends MisePlaywrightIT {
      * AC: On the ACTIVE plan's week the header renders with prev enabled and next disabled.
      */
     @Test
-    void activeWeekHasPrevEnabledAndNextDisabled() {
-        // Default navigation lands on the active plan (/plan without ?week=)
-        assertThat(page.locator("#mise-week-prev")).isVisible();
-        assertThat(page.locator("#mise-week-next")).isVisible();
+    @DisplayName("On the active week, previous week is available and next week isn't")
+    void activeWeekHasPrevEnabledAndNextDisabled(UnifiedPage page) {
+        // when: default navigation lands on the active plan (/plan without ?week=)
+        page.navigate(PlanView.class);
 
-        // Prev must be enabled — there are 2 earlier plans
-        assertThat(page.locator("#mise-week-prev")).not().hasAttribute("disabled", "");
-        assertThat(page.locator("#mise-week-prev")).not().hasAttribute("aria-disabled", "true");
-
-        // Next must be disabled — no plan after active
-        assertThat(page.locator("#mise-week-next")).hasAttribute("disabled", "");
+        // then: two earlier plans, none after the active one
+        assertThat(previousWeekButton(page)).isVisible();
+        assertThat(nextWeekButton(page)).isVisible();
+        assertThat(previousWeekButton(page)).isEnabled();
+        assertThat(nextWeekButton(page)).isDisabled();
     }
 
     /**
      * AC: The week badge shows the active week's Monday formatted as "Week of {MMM d}".
      */
     @Test
-    void activeWeekBadgeShowsActivePlanMonday() {
-        String expected = "Week of " + activePlan.getWeekStartDate().format(WEEK_FMT);
-        assertThat(page.locator("#mise-week-badge")).containsText(expected);
+    @DisplayName("The week badge shows the active week")
+    void activeWeekBadgeShowsActivePlanMonday(UnifiedPage page) {
+        page.navigate(PlanView.class);
+        assertThat(weekBadge(page)).hasTextContaining(weekLabel(activePlan));
     }
 
     /**
      * AC: Clicking prev once changes the badge to show the previous (middle) plan's Monday.
-     * Also asserts that the ?week= URL param appears after navigation.
      */
     @Test
-    void clickPrevOnceShowsMiddleWeekInBadge() {
-        page.locator("#mise-week-prev").click();
-
-        // Wait for badge to update — this implicitly waits for Vaadin navigation to complete
-        String expected = "Week of " + middlePlan.getWeekStartDate().format(WEEK_FMT);
-        assertThat(page.locator("#mise-week-badge")).containsText(expected);
+    @DisplayName("Going back one week shows the previous week")
+    void clickPrevOnceShowsMiddleWeekInBadge(UnifiedPage page) {
+        page.navigate(PlanView.class);
+        previousWeekButton(page).click();
+        assertThat(weekBadge(page)).hasTextContaining(weekLabel(middlePlan));
     }
 
     /**
      * AC: After clicking prev once, the ?week= param appears in the URL.
-     * Waits for badge update first (guarantees Vaadin navigation has completed).
      */
     @Test
-    void weekParamAppearsInUrlAfterPrevClick() {
-        page.locator("#mise-week-prev").click();
-
-        // Wait for navigation to complete by asserting the badge first
-        String expectedBadge = "Week of " + middlePlan.getWeekStartDate().format(WEEK_FMT);
-        assertThat(page.locator("#mise-week-badge")).containsText(expectedBadge);
-
-        // Now the URL must carry ?week=<middle-monday>
-        String url = page.url();
-        Assertions.assertThat(url).contains("week=");
-        Assertions.assertThat(url).contains(middlePlan.getWeekStartDate().toString());
+    @DisplayName("Going back one week puts that week in the URL")
+    void weekParamAppearsInUrlAfterPrevClick(UnifiedPage page) {
+        page.navigate(PlanView.class);
+        previousWeekButton(page).click();
+        assertThat(weekBadge(page)).hasTextContaining(weekLabel(middlePlan));
+        assertThat(page).hasQueryParameter("week", middlePlan.getWeekStartDate().toString());
     }
 
     /**
      * AC: Clicking prev twice (from active) lands on the oldest plan; prev is disabled, next is enabled.
      */
     @Test
-    void clickPrevTwiceLandsOnOldestPlan() {
-        page.locator("#mise-week-prev").click();
-        // Wait for middle-week navigation before clicking again
-        assertThat(page.locator("#mise-week-badge"))
-                .containsText("Week of " + middlePlan.getWeekStartDate().format(WEEK_FMT));
+    @DisplayName("Going back to the oldest week disables previous and enables next")
+    void clickPrevTwiceLandsOnOldestPlan(UnifiedPage page) {
+        // given
+        page.navigate(PlanView.class);
 
-        page.locator("#mise-week-prev").click();
+        // when
+        goBackTwoWeeks(page);
 
-        String expected = "Week of " + oldestPlan.getWeekStartDate().format(WEEK_FMT);
-        assertThat(page.locator("#mise-week-badge")).containsText(expected);
-
-        // At the oldest plan: prev must be disabled
-        assertThat(page.locator("#mise-week-prev")).hasAttribute("disabled", "");
-
-        // And next must be enabled
-        assertThat(page.locator("#mise-week-next")).not().hasAttribute("disabled", "");
-        assertThat(page.locator("#mise-week-next")).not().hasAttribute("aria-disabled", "true");
+        // then
+        assertThat(previousWeekButton(page)).isDisabled();
+        assertThat(nextWeekButton(page)).isEnabled();
     }
 
     /**
      * AC: After navigating to the oldest plan, clicking next returns to the middle plan.
      */
     @Test
-    void nextButtonNavigatesForwardAfterReachingOldest() {
-        // Navigate to oldest — click prev twice, waiting for each navigation
-        page.locator("#mise-week-prev").click();
-        assertThat(page.locator("#mise-week-badge"))
-                .containsText("Week of " + middlePlan.getWeekStartDate().format(WEEK_FMT));
-        page.locator("#mise-week-prev").click();
-        assertThat(page.locator("#mise-week-badge"))
-                .containsText("Week of " + oldestPlan.getWeekStartDate().format(WEEK_FMT));
+    @DisplayName("From the oldest week, next week goes forward again")
+    void nextButtonNavigatesForwardAfterReachingOldest(UnifiedPage page) {
+        // given
+        page.navigate(PlanView.class);
+        goBackTwoWeeks(page);
 
-        // Navigate forward once
-        page.locator("#mise-week-next").click();
+        // when
+        nextWeekButton(page).click();
 
-        String expected = "Week of " + middlePlan.getWeekStartDate().format(WEEK_FMT);
-        assertThat(page.locator("#mise-week-badge")).containsText(expected);
+        // then
+        assertThat(weekBadge(page)).hasTextContaining(weekLabel(middlePlan));
     }
 
     /**
      * AC: The ?week= param survives a page reload — the badge still shows the same week.
      */
     @Test
-    void weekParamPersistsAcrossReload() {
-        // Navigate to the middle plan
-        page.locator("#mise-week-prev").click();
-        String expectedBadge = "Week of " + middlePlan.getWeekStartDate().format(WEEK_FMT);
-        assertThat(page.locator("#mise-week-badge")).containsText(expectedBadge);
+    @DisplayName("The chosen week is kept after a reload")
+    void weekParamPersistsAcrossReload(UnifiedPage page) {
+        // given
+        page.navigate(PlanView.class);
+        previousWeekButton(page).click();
+        assertThat(weekBadge(page)).hasTextContaining(weekLabel(middlePlan));
+        assertThat(page).hasQueryParameter("week", middlePlan.getWeekStartDate().toString());
 
-        // Verify the URL contains the week param before reloading
-        Assertions.assertThat(page.url()).contains(middlePlan.getWeekStartDate().toString());
-
-        // Reload — the URL still has ?week=<middle-monday>
+        // when
         page.reload();
 
-        assertThat(page.locator("#mise-week-badge")).containsText(expectedBadge);
+        // then
+        assertThat(weekBadge(page)).hasTextContaining(weekLabel(middlePlan));
     }
 
     /**
      * AC: Clicking the week badge opens the DatePicker overlay.
      */
     @Test
-    void clickingBadgeOpensDatePickerOverlay() {
-        page.locator("#mise-week-badge").click();
-
-        // The DatePicker overlay element must appear in the DOM and be visible
-        assertThat(page.locator("vaadin-date-picker-overlay")).isVisible();
+    @DisplayName("Clicking the week badge opens the week picker")
+    void clickingBadgeOpensDatePickerOverlay(UnifiedPage page) {
+        page.navigate(PlanView.class);
+        // a Span with a click listener: UnifiedSpan has no click() (findings F23)
+        weekBadge(page).element().click();
+        assertThat(weekPicker(page)).hasProperty("opened", true);
     }
 
     /**
      * AC: Picking a Wednesday from the DatePicker snaps to that week's Monday (BR-07).
      * The badge must show the Monday after picking a Wednesday.
-     *
-     * <p>The DatePicker text input is hidden via CSS (only the overlay is shown). We set
-     * its value programmatically via JavaScript — Vaadin's Polymer property setter triggers
-     * the server-side ValueChangeEvent just as a user selection would.
      */
     @Test
-    void pickingWednesdaySnapsToMonday() {
-        // The Wednesday that belongs to the oldest plan's week
-        LocalDate wednesday = oldestPlan.getWeekStartDate()
-                .with(TemporalAdjusters.nextOrSame(DayOfWeek.WEDNESDAY));
+    @DisplayName("Picking a Wednesday shows the week starting that Monday")
+    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    void pickingWednesdaySnapsToMonday(UnifiedPage page) {
+        // Escape Hatch kept: the picker's input is hidden by CSS and a user picks a day in the calendar
+        // overlay, which the Unified API can't drive (UnifiedDatePicker.setValue refuses a hidden field in a
+        // browser, rightly). Set the value as the overlay does, through the web component's property.
+        Page playwright = page.unwrap(Page.class);
+        // given
+        page.navigate(PlanView.class);
+        LocalDate wednesday = oldestPlan.getWeekStartDate().with(TemporalAdjusters.nextOrSame(DayOfWeek.WEDNESDAY));
+        weekBadge(page).element().click();
+        assertThat(weekPicker(page)).hasProperty("opened", true);
 
-        // Open the picker via the badge
-        page.locator("#mise-week-badge").click();
-        assertThat(page.locator("vaadin-date-picker-overlay")).isVisible();
+        // when
+        playwright.locator("#mise-week-datepicker").evaluate("(picker, value) => { picker.value = value; }",
+                wednesday.toString());
 
-        // Set the picker value programmatically: arg is passed as the second parameter to the
-        // arrow function — Playwright's evaluate(expression, arg) pattern.
-        String isoWednesday = wednesday.toString();
-        page.locator("#mise-week-datepicker").evaluate(
-                "(picker, value) => { picker.value = value; }",
-                isoWednesday);
-
-        // After snap, the badge must show the Monday of that week (not the Wednesday)
-        LocalDate expectedMonday = oldestPlan.getWeekStartDate();
-        String expectedBadge = "Week of " + expectedMonday.format(WEEK_FMT);
-        assertThat(page.locator("#mise-week-badge")).containsText(expectedBadge);
+        // then: the badge shows the Monday of that week, not the Wednesday
+        assertThat(weekBadge(page)).hasTextContaining(weekLabel(oldestPlan));
     }
 
     /**
      * AC: Picking the same week the user is currently viewing is a no-op — URL doesn't change.
      */
     @Test
-    void pickingSameWeekIsNoOp() {
-        // Navigate to middle plan first — wait for navigation
-        page.locator("#mise-week-prev").click();
-        assertThat(page.locator("#mise-week-badge"))
-                .containsText("Week of " + middlePlan.getWeekStartDate().format(WEEK_FMT));
-        String urlBefore = page.url();
+    @DisplayName("Picking the week already shown changes nothing")
+    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    void pickingSameWeekIsNoOp(UnifiedPage page) {
+        // Escape Hatch kept: the picker's input is hidden by CSS and a user picks a day in the calendar
+        // overlay, which the Unified API can't drive (UnifiedDatePicker.setValue refuses a hidden field in a
+        // browser, rightly). Set the value as the overlay does, through the web component's property.
+        Page playwright = page.unwrap(Page.class);
+        // given
+        page.navigate(PlanView.class);
+        previousWeekButton(page).click();
+        assertThat(weekBadge(page)).hasTextContaining(weekLabel(middlePlan));
+        weekBadge(page).element().click();
+        assertThat(weekPicker(page)).hasProperty("opened", true);
 
-        // Open picker and set the same Monday that is already being viewed
-        page.locator("#mise-week-badge").click();
-        assertThat(page.locator("vaadin-date-picker-overlay")).isVisible();
+        // when
+        playwright.locator("#mise-week-datepicker").evaluate("(picker, value) => { picker.value = value; }",
+                middlePlan.getWeekStartDate().toString());
 
-        String sameMonday = middlePlan.getWeekStartDate().toString();
-        page.locator("#mise-week-datepicker").evaluate(
-                "(picker, value) => { picker.value = value; }",
-                sameMonday);
-
-        // Wait briefly for any potential navigation, then assert URL unchanged
-        page.waitForTimeout(500);
-        String urlAfter = page.url();
-        Assertions.assertThat(urlAfter).isEqualTo(urlBefore);
+        // then
+        assertThat(page).hasPath("/plan");
+        assertThat(page).hasQueryParameter("week", middlePlan.getWeekStartDate().toString());
+        assertThat(weekBadge(page)).hasTextContaining(weekLabel(middlePlan));
     }
 
     /**
      * AC: Tab links preserve the ?week= param when switching between Plan and Shopping.
-     * After clicking prev on /plan (landing on /plan?week=X), clicking the Shopping tab
-     * must navigate to /shopping?week=X.
      */
     @Test
-    void tabLinkPreservesWeekParam() {
-        // Navigate to the middle (historical) plan — wait for navigation to complete
-        page.locator("#mise-week-prev").click();
+    @DisplayName("Switching to the shopping tab keeps the chosen week")
+    void tabLinkPreservesWeekParam(UnifiedPage page) {
+        // given: the middle (historical) week
+        page.navigate(PlanView.class);
+        previousWeekButton(page).click();
         String weekStr = middlePlan.getWeekStartDate().toString();
-        assertThat(page.locator("#mise-week-badge"))
-                .containsText("Week of " + middlePlan.getWeekStartDate().format(WEEK_FMT));
-        // Confirm we have a ?week= in URL
-        Assertions.assertThat(page.url()).contains("week=" + weekStr);
+        assertThat(page).hasQueryParameter("week", weekStr);
 
-        // Click the Shopping tab — use the mise-tab class + "Shopping" text to scope
-        // away from any accidental matches in page content
-        page.locator(".mise-tab").filter(new com.microsoft.playwright.Locator.FilterOptions()
-                .setHasText("Shopping")).click();
+        // when
+        // the tab is a Div with a click listener: UnifiedDiv has no click() (findings F23)
+        page.find(UnifiedDiv.class).withClassName("mise-tab").withText("Shopping").element().click();
 
-        // Wait for /shopping to load — title changes
-        assertThat(page).hasTitle("Mise — Shopping");
-
-        // The URL must be /shopping?week=<middle-monday>
-        String url = page.url();
-        Assertions.assertThat(url).contains("/shopping");
-        Assertions.assertThat(url).contains("week=" + weekStr);
+        // then
+        assertThat(page).hasPath("/shopping");
+        assertThat(page).hasQueryParameter("week", weekStr);
     }
 
     /**
-     * AC: Navigating directly to /plan?week=<old-monday> renders that older plan's meals
-     * in the PlanView (7 meal rows belonging to oldestPlan).
+     * AC: Navigating directly to /plan?week=<old-monday> renders that older plan's meals.
      */
     @Test
-    void directWeekUrlRendersOlderPlanMeals() {
-        String oldMonday = oldestPlan.getWeekStartDate().toString();
-        page.navigate(getUrl() + "/plan?week=" + oldMonday);
-
-        // Badge must show the oldest plan's Monday
-        String expected = "Week of " + oldestPlan.getWeekStartDate().format(WEEK_FMT);
-        assertThat(page.locator("#mise-week-badge")).containsText(expected);
-
-        // The meal grid must still render 7 rows (one per day)
-        assertThat(page.getByTestId("meal-row")).hasCount(7);
+    @DisplayName("Opening an older week by URL shows its seven meals")
+    void directWeekUrlRendersOlderPlanMeals(UnifiedPage page) {
+        // a path: UnifiedPage.navigate has no Class + query-parameters overload
+        page.navigate("/plan?week=" + oldestPlan.getWeekStartDate());
+        assertThat(weekBadge(page)).hasTextContaining(weekLabel(oldestPlan));
+        assertThat(page.find(UnifiedDiv.class).withTestId("meal-row")).hasCount(7);
     }
 
     /**
      * AC: Clicking the brand wordmark navigates to /plan (active week, no ?week= param).
      */
     @Test
-    void brandWordmarkNavigatesToActiveWeek() {
-        // Go to oldest plan first via direct URL
-        page.navigate(getUrl() + "/plan?week=" + oldestPlan.getWeekStartDate());
-        assertThat(page.locator("#mise-week-badge"))
-                .containsText("Week of " + oldestPlan.getWeekStartDate().format(WEEK_FMT));
+    @DisplayName("The Mise logo goes back to the active week")
+    void brandWordmarkNavigatesToActiveWeek(UnifiedPage page) {
+        // given: the oldest week
+        // a path: UnifiedPage.navigate has no Class + query-parameters overload
+        page.navigate("/plan?week=" + oldestPlan.getWeekStartDate());
+        assertThat(weekBadge(page)).hasTextContaining(weekLabel(oldestPlan));
 
-        // Click the brand/home wordmark
-        page.locator("[data-testid='app-header-wordmark']").click();
+        // when
+        // the brand is a Div with a click listener: UnifiedDiv has no click() (findings F23)
+        page.find(UnifiedDiv.class).withTestId("app-header-wordmark").element().click();
 
-        // Must navigate to active week — badge shows active plan's Monday
-        String expected = "Week of " + activePlan.getWeekStartDate().format(WEEK_FMT);
-        assertThat(page.locator("#mise-week-badge")).containsText(expected);
+        // then: the active week, with a clean URL
+        assertThat(weekBadge(page)).hasTextContaining(weekLabel(activePlan));
+        assertThat(page).hasQueryParameter("week", null);
+    }
 
-        // URL must no longer contain a ?week= param (active plan uses clean URL)
-        Assertions.assertThat(page.url()).doesNotContain("week=");
+    private static UnifiedButton previousWeekButton(UnifiedPage page) {
+        return page.find(UnifiedButton.class).withAccessibleName("Previous week");
+    }
+
+    private static UnifiedButton nextWeekButton(UnifiedPage page) {
+        return page.find(UnifiedButton.class).withAccessibleName("Next week");
+    }
+
+    private static UnifiedSpan weekBadge(UnifiedPage page) {
+        return page.find(UnifiedSpan.class).withId("mise-week-badge");
+    }
+
+    private static UnifiedDatePicker weekPicker(UnifiedPage page) {
+        return page.find(UnifiedDatePicker.class).withId("mise-week-datepicker");
+    }
+
+    private static String weekLabel(Plan plan) {
+        return "Week of " + plan.getWeekStartDate().format(WEEK_FMT);
+    }
+
+    private void goBackTwoWeeks(UnifiedPage page) {
+        page.step("Go back to the oldest week", () -> {
+            previousWeekButton(page).click();
+            assertThat(weekBadge(page)).hasTextContaining(weekLabel(middlePlan));
+            previousWeekButton(page).click();
+            assertThat(weekBadge(page)).hasTextContaining(weekLabel(oldestPlan));
+        });
     }
 }

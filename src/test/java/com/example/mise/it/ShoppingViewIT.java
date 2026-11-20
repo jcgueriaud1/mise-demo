@@ -1,5 +1,14 @@
 package com.example.mise.it;
 
+import com.example.mise.ui.shopping.ShoppingView;
+import com.example.mise.it.support.TestChatModel;
+import com.vaadin.testing.unified.RequiresTestingTool;
+import com.vaadin.testing.unified.TestingTool;
+import com.vaadin.testing.unified.UnifiedPage;
+import com.vaadin.testing.unified.spring.UnifiedSpringBootTest;
+import com.example.mise.it.support.TestAiConfig;
+import org.springframework.context.annotation.Import;
+import org.springframework.test.context.ActiveProfiles;
 import com.example.mise.capabilities.recipes.RecipeCatalog;
 import com.example.mise.domain.conversation.ConversationMessageRepository;
 import com.example.mise.domain.household.Household;
@@ -16,23 +25,32 @@ import com.example.mise.domain.shopping.PantryItem;
 import com.example.mise.domain.shopping.PantryRepository;
 import com.example.mise.domain.shopping.PantryService;
 
-import com.microsoft.playwright.Locator;
+import com.microsoft.playwright.Page;
+
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import com.vaadin.flow.component.html.H2;
+import com.vaadin.testing.unified.component.UnifiedButton;
+import com.vaadin.testing.unified.component.UnifiedContainer;
+import com.vaadin.testing.unified.component.UnifiedDetails;
+import com.vaadin.testing.unified.component.UnifiedDiv;
+import com.vaadin.testing.unified.component.UnifiedGenericComponent;
+import com.vaadin.testing.unified.component.UnifiedSpan;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import java.math.BigDecimal;
 import java.util.List;
 
-import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
+import static com.vaadin.testing.unified.assertion.UnifiedAssertions.assertThat;
 
 /**
  * UC-005 Playwright IT — Shopping list view at /shopping.
  *
- * <p>Lifecycle: {@code setupTest()} seeds a Household and a seeded active plan before
- * the browser navigates to /shopping. The plan is generated from two specific recipes
+ * <p>Lifecycle: a {@code @BeforeEach} seeds a Household and a seeded active plan before
+ * each test opens /shopping. The plan is generated from two specific recipes
  * (salmon-pasta + tuna-pasta) that share two ingredients (pasta, garlic) to enable
  * deterministic consolidation assertions (AC #2).
  *
@@ -40,7 +58,19 @@ import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertTha
  * meal_edit → extra_shopping_item → pantry_item → view_preference →
  * conversation_message → meal → plan → household.
  */
-class ShoppingViewIT extends MisePlaywrightIT {
+@ActiveProfiles("it")
+@Import(TestAiConfig.class)
+@UnifiedSpringBootTest
+class ShoppingViewIT {
+
+
+    @Autowired
+    TestChatModel chatModel;
+
+    @BeforeEach
+    void resetChatModelBetweenTests() {
+        chatModel.reset();
+    }
 
     @Autowired
     private HouseholdService householdService;
@@ -78,20 +108,14 @@ class ShoppingViewIT extends MisePlaywrightIT {
     @Autowired
     private ExtraShoppingItemRepository extraShoppingItemRepository;
 
-    @Override
-    public String getView() {
-        return "/shopping";
-    }
-
     /**
-     * Override: seed Household + active plan BEFORE the base class navigates to /shopping.
+     * Seeds Household + active plan before each test opens /shopping.
      * The plan is generated via the standard production path (picks 7 recipes).
      * Both salmon-pasta and tuna-pasta share "pasta" (400 g each) and "garlic" (3 cloves each),
      * which enables AC #2 (consolidation) and AC #5 (already-have on garlic) assertions.
      */
-    @Override
     @BeforeEach
-    public void setupTest() throws Exception {
+    void seedBeforeNavigation() throws Exception {
         // Seed household
         Household h = new Household();
         h.setName("IT Shopping Household");
@@ -104,9 +128,6 @@ class ShoppingViewIT extends MisePlaywrightIT {
         // Generate the active plan using the production path (7 meals from catalog).
         var household = householdService.findHousehold().orElseThrow();
         planService.generateActivePlan(household, recipeCatalog);
-
-        // Navigate AFTER seeding so ShoppingView.beforeEnter() finds the household and plan.
-        super.setupTest();
     }
 
     @AfterEach
@@ -134,118 +155,114 @@ class ShoppingViewIT extends MisePlaywrightIT {
      * AC #1 (route/title): visiting /shopping loads the correct page title.
      */
     @Test
-    void hasPageTitle() {
-        assertThat(page).hasTitle("Mise — Shopping");
+    @DisplayName("The shopping page has its browser tab title")
+    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    void hasPageTitle(UnifiedPage page) {
+        // Escape Hatch kept: the Unified API has no page-title assertion
+        Page playwright = page.unwrap(Page.class);
+        page.navigate(ShoppingView.class);
+        com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat(playwright).hasTitle("Mise — Shopping");
     }
 
     /**
-     * AC #1: the recommended-store name is present somewhere in the view.
-     * On desktop the store badge in the header strip is hidden (display:none per CSS) and
-     * the store name appears in the recommendation panel headline instead. The badge is
-     * always attached to the DOM (for mobile use) but not visible on desktop. We assert the
-     * recommendation-panel headline carries a non-empty store name on desktop.
+     * AC #1: the recommended-store name is present in the view. The header-strip badge is for
+     * mobile (hidden by CSS on desktop, so its visibility is a browser concern); the store name
+     * the user reads on desktop is the recommendation panel's headline.
      */
     @Test
-    void recommendedStoreBadgeIsVisible() {
-        // Store badge is in the DOM (for mobile) but hidden on desktop — check it's attached
-        Locator badge = page.locator("#mise-shopping-store-recommended");
-        assertThat(badge).isAttached();
+    @DisplayName("The shopping page names the recommended store")
+    void recommendedStoreBadgeIsVisible(UnifiedPage page) {
+        page.navigate(ShoppingView.class);
 
-        // The store name is always visible via the recommendation panel headline on desktop
-        Locator storeHeadline = page.getByTestId("recommendation-panel")
-                .locator(".mise-shopping-rec-store-name");
+        assertThat(page.find(UnifiedSpan.class).withId("mise-shopping-store-recommended")).exists();
+        UnifiedGenericComponent storeHeadline = recommendationPanel(page).findComponent(H2.class)
+                .withClassName("mise-shopping-rec-store-name");
         assertThat(storeHeadline).isVisible();
-        assertThat(storeHeadline).not().hasText("—");
-        assertThat(storeHeadline).not().isEmpty();
+        Assertions.assertThat(storeHeadline.getText().strip()).isNotEmpty().isNotEqualTo("—");
     }
 
     /**
      * AC #1: the total-cost span is visible and contains a € sign.
      */
     @Test
-    void totalCostSpanShowsEuroSign() {
-        Locator totalCost = page.getByTestId("shopping-total-cost");
+    @DisplayName("The shopping page shows the total cost in euros")
+    void totalCostSpanShowsEuroSign(UnifiedPage page) {
+        page.navigate(ShoppingView.class);
+        UnifiedContainer totalCost = page.find(UnifiedContainer.class).withTestId("shopping-total-cost");
         assertThat(totalCost).isVisible();
-        assertThat(totalCost).containsText("€");
+        assertThat(totalCost).hasTextContaining("€");
     }
 
     /**
      * AC #1: the store-mode toggle control is visible with both segment buttons.
-     * Scoped to the recommendation panel — the toggle appears in two places in the DOM
-     * (mobile strip + desktop panel); on desktop only the panel instance is visible.
+     * Scoped to the recommendation panel — the toggle appears in two places
+     * (mobile strip + desktop panel).
      */
     @Test
-    void storeModeToggleIsVisible() {
-        Locator panel = page.getByTestId("recommendation-panel");
-        assertThat(panel.getByTestId("store-mode-toggle")).isVisible();
-        assertThat(panel.getByTestId("store-mode-one")).isVisible();
-        assertThat(panel.getByTestId("store-mode-mix")).isVisible();
+    @DisplayName("The store mode toggle offers one store or the cheapest mix")
+    void storeModeToggleIsVisible(UnifiedPage page) {
+        page.navigate(ShoppingView.class);
+        UnifiedContainer panel = recommendationPanel(page);
+        assertThat(panel.find(UnifiedContainer.class).withTestId("store-mode-toggle")).isVisible();
+        assertThat(storeModeButton(panel, "store-mode-one")).isVisible();
+        assertThat(storeModeButton(panel, "store-mode-mix")).isVisible();
     }
 
     /**
-     * AC #1: the pantry section (collapsed by default) is present in the DOM.
+     * AC #1: the pantry section (collapsed by default) is present.
      */
     @Test
-    void pantrySectionExistsInDom() {
-        assertThat(page.getByTestId("pantry-section")).isAttached();
+    @DisplayName("The shopping page has a pantry section")
+    void pantrySectionExistsInDom(UnifiedPage page) {
+        page.navigate(ShoppingView.class);
+        assertThat(page.find(UnifiedDetails.class).withTestId("pantry-section")).exists();
     }
 
     /**
      * AC #1: at least one aisle group is rendered when the plan is seeded.
      */
     @Test
-    void atLeastOneAisleGroupRendered() {
-        Locator aisleGroups = page.locator("[id^='mise-shopping-aisle-']");
-        assertThat(aisleGroups.first()).isVisible();
-        // Require at least 1 aisle group
-        int count = aisleGroups.count();
-        Assertions.assertThat(count).isGreaterThanOrEqualTo(1);
+    @DisplayName("The shopping list is grouped by aisle")
+    void atLeastOneAisleGroupRendered(UnifiedPage page) {
+        page.navigate(ShoppingView.class);
+        assertThat(page.find(UnifiedDiv.class).withClassName("mise-shopping-aisle-group")).exists();
     }
 
     /**
      * AC #1: at least one shopping row is rendered.
      */
     @Test
-    void atLeastOneShoppingRowRendered() {
-        Locator rows = page.getByTestId("shopping-row");
-        assertThat(rows.first()).isVisible();
-        int count = rows.count();
-        Assertions.assertThat(count).isGreaterThanOrEqualTo(1);
+    @DisplayName("The shopping list has items")
+    void atLeastOneShoppingRowRendered(UnifiedPage page) {
+        page.navigate(ShoppingView.class);
+        assertThat(shoppingRows(page)).exists();
     }
 
     /**
-     * AC #2 (consolidation): salmon-pasta and tuna-pasta both contain "pasta" (400 g each).
-     * When both appear in the active plan (7 meals, catalog has 18 recipes, so statistical
-     * chance both appear in a 7-meal plan is moderate). This test seeds the plan via
-     * generateActivePlan; if the seeded plan happens to include both pasta recipes the
-     * assertion is live, otherwise the test confirms a single pasta row (no duplicates).
-     *
-     * <p>Deterministic consolidation approach: since we cannot force which 7 recipes are
-     * selected (generateActivePlan picks randomly), we assert the invariant that there is
-     * at most ONE shopping row whose name is "pasta" — regardless of how many recipes
-     * contributed. Consolidation must never produce duplicate rows for the same ingredient
-     * and unit.
+     * AC #2 (consolidation): we cannot force which 7 recipes generateActivePlan picks, so we
+     * assert the invariant that there is at most ONE shopping row for "pasta" — regardless of
+     * how many recipes contributed. Consolidation must never produce duplicate rows for the
+     * same ingredient and unit.
      */
     @Test
-    void pastaIngredientAppearsAtMostOnce() {
-        // Find all shopping rows whose visible text contains "pasta"
-        Locator pastaRows = page.locator("[data-testid='shopping-row']")
-                .filter(new Locator.FilterOptions().setHasText("pasta"));
-        int count = pastaRows.count();
-        // Consolidation rule: cannot have more than 1 row for the same ingredient+unit combo
-        Assertions.assertThat(count)
+    @DisplayName("An ingredient used by several meals is listed once")
+    void pastaIngredientAppearsAtMostOnce(UnifiedPage page) {
+        page.navigate(ShoppingView.class);
+        assertThat(shoppingRows(page)).exists();
+        Assertions.assertThat(shoppingRows(page).withTextContaining("pasta").all())
                 .as("AC #2: pasta must appear as at most one consolidated row, never duplicated")
-                .isLessThanOrEqualTo(1);
+                .hasSizeLessThanOrEqualTo(1);
     }
 
     /**
      * AC #3 (staple subtraction): a PantryItem saved with staple=true and name "olive oil"
      * must NOT appear as a shopping row after page reload.
-     * olive oil appears in tuna-pasta and lentil-soup; as a staple it must be suppressed.
      */
     @Test
-    void stapleOliveOilIsSuppressedFromShoppingList() {
-        // Save a staple pantry item for olive oil BEFORE re-navigating
+    @DisplayName("A pantry staple is left off the shopping list")
+    void stapleOliveOilIsSuppressedFromShoppingList(UnifiedPage page) {
+        // given: olive oil is a pantry staple
+        page.navigate(ShoppingView.class);
         var household = householdService.findHousehold().orElseThrow();
         var oliveOil = new PantryItem();
         oliveOil.setHouseholdId(household.getId());
@@ -253,36 +270,30 @@ class ShoppingViewIT extends MisePlaywrightIT {
         oliveOil.setStaple(true);
         pantryService.save(oliveOil);
 
-        // Reload the view so ShoppingService re-derives with the new pantry staple
-        page.navigate(getUrl() + "/shopping");
+        // when: ShoppingService re-derives the list
+        page.reload();
 
-        // Assert there is no shopping row whose visible text contains "olive oil"
-        Locator oliveOilRows = page.locator("[data-testid='shopping-row']")
-                .filter(new Locator.FilterOptions().setHasText("olive oil"));
-        Assertions.assertThat(oliveOilRows.count())
-                .as("AC #3: olive oil (staple) must be suppressed from the shopping list")
-                .isZero();
+        // then
+        assertThat(shoppingRows(page)).exists();
+        assertThat(shoppingRows(page).withTextContaining("olive oil")).doesNotExist();
     }
 
     /**
      * AC #4 (store-mode toggle + persistence): clicking "Cheapest mix" persists a
      * ViewPreference row with mode=CHEAPEST_MIX. After a page reload the Cheapest-mix
-     * button retains the "active" CSS class.
+     * button is still the active one.
      */
     @Test
-    void storeModeTogglePersistsAcrossReload() {
-        // Scope to the recommendation panel — both strip and panel have the same data-testids;
-        // on desktop the panel is the visible/interactive one.
-        Locator panel = page.getByTestId("recommendation-panel");
+    @DisplayName("The chosen store mode is remembered after a reload")
+    void storeModeTogglePersistsAcrossReload(UnifiedPage page) {
+        // given
+        page.navigate(ShoppingView.class);
 
-        // Click the "Cheapest mix" button
-        panel.getByTestId("store-mode-mix").click();
+        // when
+        storeModeButton(recommendationPanel(page), "store-mode-mix").click();
 
-        // Wait for the view to rebuild (the button should now have the "active" class)
-        assertThat(panel.getByTestId("store-mode-mix")).hasClass(
-                new java.util.regex.Pattern[]{java.util.regex.Pattern.compile("active")});
-
-        // Assert DB: ViewPreference row exists with mode=CHEAPEST_MIX
+        // then: the view rebuilds with Cheapest mix active, and the choice is stored
+        assertThat(storeModeButton(recommendationPanel(page), "store-mode-mix").withClassName("active")).exists();
         var household = householdService.findHousehold().orElseThrow();
         var prefOpt = viewPreferenceRepository.findByHouseholdIdAndViewAndWidgetKey(
                 household.getId(), ViewPreference.View.SHOPPING, "storeMode");
@@ -293,100 +304,76 @@ class ShoppingViewIT extends MisePlaywrightIT {
                 .as("AC #4: stored settings must indicate CHEAPEST_MIX mode")
                 .contains("CHEAPEST_MIX");
 
-        // Reload the page — the preference must be restored from DB
+        // when
         page.reload();
 
-        // Re-scope after reload
-        Locator panelAfterReload = page.getByTestId("recommendation-panel");
-
-        // After reload, the Cheapest-mix button must still carry the "active" class
-        assertThat(panelAfterReload.getByTestId("store-mode-mix")).hasClass(
-                new java.util.regex.Pattern[]{java.util.regex.Pattern.compile("active")});
-
-        // And the One-store button must NOT carry the "active" class
-        assertThat(panelAfterReload.getByTestId("store-mode-one")).not().hasClass(
-                new java.util.regex.Pattern[]{java.util.regex.Pattern.compile("active")});
+        // then
+        UnifiedContainer panel = recommendationPanel(page);
+        assertThat(storeModeButton(panel, "store-mode-mix").withClassName("active")).exists();
+        assertThat(storeModeButton(panel, "store-mode-one").withClassName("active")).doesNotExist();
     }
 
     /**
      * AC #5 (already-have affordance): clicking the "already have" button on the first
-     * visible shopping row (a) removes that row from the active list (count drops by 1),
+     * shopping row (a) removes that row from the active list (count drops by 1),
      * and (b) creates a non-staple PantryItem for that ingredient.
      */
     @Test
-    void alreadyHaveButtonRemovesRowAndCreatesPantryItem() {
-        Locator rows = page.getByTestId("shopping-row");
-        // Wait for the list to settle before snapshotting the count. Without this
-        // the test flakes: rows.count() returns mid-render (e.g. 33 of 34 visible),
-        // we click delete, and the final 34th row arrives and is then removed,
-        // landing on 32 instead of before-1 = 33. Two consecutive snapshots with
-        // a brief delay between them is enough to gate the click on a stable list.
-        assertThat(rows.first()).isVisible();
-        int before;
-        while (true) {
-            int sample = rows.count();
-            page.waitForTimeout(150);
-            if (sample == rows.count()) { before = sample; break; }
-        }
-        Assertions.assertThat(before)
-                .as("Precondition: shopping list must have at least one row to test AC #5")
-                .isGreaterThanOrEqualTo(1);
+    @DisplayName("Marking an item as already had removes it and adds it to the pantry")
+    void alreadyHaveButtonRemovesRowAndCreatesPantryItem(UnifiedPage page) {
+        // given
+        page.navigate(ShoppingView.class);
+        assertThat(shoppingRows(page)).exists();
+        int before = shoppingRows(page).all().size();
+        String ingredientName = shoppingRows(page).all().getFirst().find(UnifiedSpan.class)
+                .withClassName("mise-shopping-item-name").getText().strip();
 
-        // Get the name of the ingredient in the first row by reading its visible text
-        // The item-name span carries class mise-shopping-item-name
-        Locator firstRow = rows.first();
-        String ingredientName = firstRow.locator(".mise-shopping-item-name").innerText().trim();
+        // when
+        page.find(UnifiedButton.class).withAccessibleName("Mark " + ingredientName + " as already have").click();
 
-        // Click the "already have" button scoped to the first row
-        firstRow.getByTestId("row-already-have").click();
-
-        // AC #5a: the row count must have dropped by exactly one
-        assertThat(page.getByTestId("shopping-row")).hasCount(before - 1);
-
-        // AC #5b: a PantryItem with that ingredient name (non-staple) must exist in DB
+        // then
+        assertThat(shoppingRows(page)).hasCount(before - 1);
         var household = householdService.findHousehold().orElseThrow();
         List<PantryItem> pantryItems = pantryRepository.findByHouseholdId(household.getId());
-        final String name = ingredientName;
         Assertions.assertThat(pantryItems)
-                .as("AC #5: PantryItem for '%s' must exist after clicking 'already have'", name)
-                .anyMatch(pi -> pi.getIngredientName().equalsIgnoreCase(name) && !pi.isStaple());
+                .as("AC #5: PantryItem for '%s' must exist after clicking 'already have'", ingredientName)
+                .anyMatch(pi -> pi.getIngredientName().equalsIgnoreCase(ingredientName) && !pi.isStaple());
     }
 
     /**
-     * AC #6 (live reflow — broadcaster-driven, deterministic path): after a plan meal
-     * is swapped via planService directly, navigating back to /shopping shows the
-     * updated ingredient set. This exercises the re-derive path without requiring the
-     * async broadcaster (which depends on UI.access from a non-UI thread).
-     *
-     * <p>Strategy: capture the initial set of row ids, swap one meal to lentil-soup
-     * (which has "red lentils" — a distinctive ingredient not present in other catalog
-     * recipes), then reload /shopping and assert "red lentils" appears.
-     * If the active plan already contains lentil-soup, we swap to it from something else
-     * which is still a valid re-derive; in that edge case the assertion may not be
-     * meaningful, so we pick the first non-lentil-soup meal and swap to lentil-soup.
+     * AC #6 (live reflow — deterministic path): after a plan meal is swapped via planService
+     * directly, reloading /shopping shows the updated ingredient set. Swaps one meal to
+     * lentil-soup, whose "red lentils" no other catalog recipe has.
      */
     @Test
-    void planSwapReflowsShoppingList() {
+    @DisplayName("Swapping a meal in the plan updates the shopping list")
+    void planSwapReflowsShoppingList(UnifiedPage page) {
+        // given
+        page.navigate(ShoppingView.class);
         var household = householdService.findHousehold().orElseThrow();
         var plan = planService.findActivePlan(household.getId()).orElseThrow();
-
-        // Find a meal that is NOT already lentil-soup (swap target has "red lentils")
-        var meals = planService.findMeals(plan.getId());
-        var targetMeal = meals.stream()
+        var targetMeal = planService.findMeals(plan.getId()).stream()
                 .filter(m -> !"lentil-soup".equals(m.getRecipeRef()))
                 .findFirst()
                 .orElseThrow(() -> new AssertionError("All 7 meals are already lentil-soup — cannot test reflow"));
 
-        // Swap the meal to lentil-soup via the service (deterministic — no AI involved)
+        // when: a deterministic swap (no AI), then a reload re-derives the list
         planService.swapMeal(targetMeal.getId(), "lentil-soup", "IT reflow test");
+        page.reload();
 
-        // Navigate back to /shopping — beforeEnter re-derives the list from the updated plan
-        page.navigate(getUrl() + "/shopping");
+        // then
+        assertThat(shoppingRows(page).withTextContaining("red lentils")).exists();
+    }
 
-        // "red lentils" is a unique ingredient from lentil-soup; it must now appear in the list
-        Locator redLentilRows = page.locator("[data-testid='shopping-row']")
-                .filter(new Locator.FilterOptions().setHasText("red lentils"));
-        // Playwright LocatorAssertions does not have .as(); the failure message comes from isVisible() timeout
-        assertThat(redLentilRows.first()).isVisible();
+    private static UnifiedContainer recommendationPanel(UnifiedPage page) {
+        return page.find(UnifiedContainer.class).withTestId("recommendation-panel");
+    }
+
+    private static UnifiedButton storeModeButton(UnifiedContainer panel, String testId) {
+        return panel.find(UnifiedButton.class).withTestId(testId);
+    }
+
+    private static UnifiedDiv shoppingRows(UnifiedPage page) {
+        return page.find(UnifiedDiv.class).withTestId("shopping-row");
     }
 }

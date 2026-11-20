@@ -173,7 +173,7 @@ Append this single line under `## Guardrails` in the Phase 1 prompt so the Phase
 
 ## Phase 1.5 — IT Generate + Run (Sonnet)
 
-After the implementation compiles and unit tests pass, generate (or extend) a DramaFinder-based Playwright IT that exercises the UC's main flow at the IT layer — deterministic, fast, runnable headless in CI without a live LLM. A green IT becomes the regression baseline that every later fix iteration re-runs automatically.
+After the implementation compiles and unit tests pass, generate (or extend) a Unified UI Test IT (runs on Playwright and Browserless) that exercises the UC's main flow at the IT layer — deterministic, fast, runnable headless in CI without a live LLM. A green IT becomes the regression baseline that every later fix iteration re-runs automatically.
 
 ### Why here, not later
 
@@ -185,12 +185,12 @@ This phase covers the **deterministic UI surface**: route loads, page title, key
 
 ### Delegate
 
-`Agent` with `subagent_type=general-purpose`, `model=sonnet`. The `vaadin-playwright-test` skill (vendored under `.claude/skills/`) governs style and structure — its rules (one assert per test, user-facing locators, no `Thread.sleep`, DramaFinder elements over raw Playwright locators) apply.
+`Agent` with `subagent_type=general-purpose`, `model=sonnet`. The `write-unified-ui-tests` skill (`.claude/skills/write-unified-ui-tests/SKILL.md`, installed by the unified-test migration) governs style and structure — `@DisplayName` sentence per test, given/when/then, user-facing lookups (`withLabel` / `withText` / `withAccessibleName` before `withTestId` / `withId`), retrying `assertThat(..)` instead of raw waits, and an Escape Hatch only with `@RequiresTestingTool` plus a `// Escape Hatch kept: <reason>` line. `UnifiedStyleTest` enforces the style on `./mvnw test`.
 
 Prompt skeleton:
 
 ```
-You are generating a Playwright IT for UC-NNN against the just-implemented view(s). Follow the conventions in `.claude/skills/vaadin-playwright-test/SKILL.md` and `TESTING.md`.
+You are generating a Unified UI Test IT for UC-NNN against the just-implemented view(s). Follow `.claude/skills/write-unified-ui-tests/SKILL.md`.
 
 ## Implementator's report (just returned)
 {paste the Phase 1 subagent summary — files created/modified, components used, any stable ids/labels added}
@@ -202,16 +202,16 @@ You are generating a Playwright IT for UC-NNN against the just-implemented view(
 {paste UI/Routes + Acceptance Criteria from the UC file}
 
 ## Existing IT infrastructure (do not reimplement)
-- Base class: `com.example.mise.it.MisePlaywrightIT` — extend it. Provides `@SpringBootTest(RANDOM_PORT)`, `@ActiveProfiles("it")`, `@LocalServerPort` wiring, `@Import(TestAiConfig.class)`, and an `@Autowired TestChatModel chatModel` that is `reset()`-ed before each test.
+- No base class. Annotate the IT `@UnifiedSpringBootTest @ActiveProfiles("it") @Import(TestAiConfig.class)`, inject `@Autowired TestChatModel chatModel` and `reset()` it in a `@BeforeEach`; test methods take a `UnifiedPage page` parameter and start with `page.navigate("/<route>")` after any seeding.
 - For AI-driven assertions: call `chatModel.queueReply("...")` BEFORE typing user input; the stub returns that text as the assistant turn (with `finish_reason=stop`). Never assert a particular reply text without queuing it first.
-- DramaFinder elements (in `org.vaadin.addons.dramafinder.element`): `MessageInputElement.typeAndSubmit(String)`, `MessageListElement.assertMessageCount(int) / getMessage(int)`, `ButtonElement`, `GridElement`, `TextFieldElement`, `ComboBoxElement`, etc. See `.claude/skills/vaadin-playwright-test/element-mapping.md` for the full table.
-- Existing examples to mirror: `src/test/java/com/example/mise/it/HomeViewIT.java` (no-AI smoke, 3 tests), `src/test/java/com/example/mise/it/OnboardingViewIT.java` (AI round-trip with stubbed reply, 3 tests).
+- Wrappers: the built-in `com.vaadin.testing.unified.component.Unified*` (Button, TextField, Grid, Notification, DatePicker, Span, Div, Container, …) plus the project's chat Wrappers in `com.example.mise.it.support.wrappers`: `UnifiedMessageInput.send(String)` and `UnifiedMessageList.getMessageTexts() / getMessageCount()` (wait with `page.waitUntil(() -> list.getMessageCount() == n)`). Clickable `Div`/`Span`s need `wrapper.element().click()` (alpha3 gives them no `click()`).
+- Existing examples to mirror: `src/test/java/com/example/mise/it/HomeViewIT.java` (no-AI smoke), `src/test/java/com/example/mise/it/OnboardingViewIT.java` (AI round-trip with stubbed reply), `src/test/java/com/example/mise/it/ChatBusyStopIT.java` (paused / cancelled streaming).
 
 ## Where to write
 `src/test/java/com/example/mise/it/<View>IT.java`. If an IT for that view already exists, **extend it** with new `@Test` methods — do not create a parallel file.
 
 ## Coverage rules
-- **DO** assert: route loads, page title (`assertThat(page).hasTitle(...)`), key components visible by user-facing locator, user input round-trips through the stubbed assistant, persisted state via repository injection.
+- **DO** assert: route loads (`assertThat(page).isAt(View.class)`), key components visible by user-facing locator, user input round-trips through the stubbed assistant, persisted state via repository injection.
 - **DO NOT** assert: real-LLM phrasing, tool-call invocations, network timing, anything dependent on prompt-engineering. Tool-level behaviour belongs in `src/test/java/.../<View>ToolsTest.java`.
 - One `@Test` method per piece of functionality.
 - User-facing locators only (label, aria-label, role, stable id, stable text). If the implementator did not add a stable locator for a component you need to assert against, **report this back** — do not reach for css-class or generated-id selectors.
@@ -628,18 +628,12 @@ When a UC's progress file reaches all `done`:
 
 When all input UCs are done, emit one combined summary table and stop.
 
-## When to reach for Browserless vs Playwright in Phase 1.5
+## Browserless vs Playwright in Phase 1.5
 
-Default to Playwright (existing pattern, `MisePlaywrightIT` base) when the test cares about:
-- CSS / layout rendering, responsive breakpoints, dark-mode contrast
-- Real browser DOM (shadow DOM walking, focus rings, native form validation popups)
-- Anything Visual Verify will later screenshot
+A Unified UI Test runs on both: `./mvnw -Pit verify` runs every IT on Playwright (`it-playwright`) and on Browserless (`it-browserless`). Write it once against the Unified API. Only when a test needs a real browser does it leave the Unified API:
+- CSS / layout rendering, computed styles, scroll position, responsive breakpoints, dark-mode contrast
+- the page title, CSS-hidden inputs driven through an overlay, arbitrary JavaScript
 
-Reach for Browserless (`SpringBrowserlessTest`, see `src/test/java/com/example/mise/browserless/PlanViewBrowserlessTest.java`) when the test cares only about:
-- Component-state assertions after a click (e.g. `MealEditRepository` rows after a row-undo button click)
-- Vaadin component-tree wiring (which view loaded, what `$(Button.class).id("...")` finds)
-- Repository side-effects of a UI interaction
+Such a test takes `@RequiresTestingTool(TestingTool.PLAYWRIGHT)`, unwraps `page.unwrap(Page.class)`, and starts with `// Escape Hatch kept: <reason>`; Browserless skips it. Everything else (component state after a click, repository side-effects, navigation, chat round-trips with the stubbed model) stays tool-neutral and runs on both. Check a new test on both before handing back: `./mvnw -Pit verify -Dit.test=<View>IT`.
 
-Browserless tests run ~5-10x faster per case (no Chromium boot, no servlet container, no network) and run under the default `./mvnw test` profile — they don't need `-Pit`. If a UC has many UI-interaction tests with no rendering concerns (UC-008 cross-view chat, UC-009 insights mute / show / dismiss flows), prefer Browserless for those and keep Playwright for the visual surface.
-
-The Phase 1.5 IT generator may choose either; both follow the same "no workaround tests" rule and the same locator-stability requirement from the implementer.
+The Phase 1.5 IT generator follows the same "no workaround tests" rule and the same locator-stability requirement from the implementer.

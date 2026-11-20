@@ -1,5 +1,13 @@
 package com.example.mise.it;
 
+import com.example.mise.ui.plan.PlanView;
+import com.example.mise.it.support.TestChatModel;
+import com.vaadin.testing.unified.UnifiedPage;
+import com.vaadin.testing.unified.spring.UnifiedSpringBootTest;
+import com.example.mise.it.support.TestAiConfig;
+
+import org.springframework.context.annotation.Import;
+import org.springframework.test.context.ActiveProfiles;
 import com.example.mise.capabilities.recipes.RecipeCatalog;
 import com.example.mise.domain.conversation.ConversationMessageRepository;
 import com.example.mise.domain.household.Household;
@@ -15,16 +23,19 @@ import com.example.mise.domain.plan.PlanService;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import com.vaadin.testing.unified.component.UnifiedButton;
+import com.vaadin.testing.unified.component.UnifiedDiv;
+import com.vaadin.testing.unified.component.UnifiedSpan;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.regex.Pattern;
 
-import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
+import static com.vaadin.testing.unified.assertion.UnifiedAssertions.assertThat;
 
 /**
  * UC-011 Playwright IT — "generate future weeks" visible surface in the week-navigation header.
@@ -48,7 +59,19 @@ import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertTha
  * <p>Cleanup in {@code @AfterEach} deletes rows in FK-safe order:
  * meal_edit → conversation_message → meal → plan → household.
  */
-class GenerateFutureWeeksIT extends MisePlaywrightIT {
+@ActiveProfiles("it")
+@Import(TestAiConfig.class)
+@UnifiedSpringBootTest
+class GenerateFutureWeeksIT {
+
+
+    @Autowired
+    TestChatModel chatModel;
+
+    @BeforeEach
+    void resetChatModelBetweenTests() {
+        chatModel.reset();
+    }
 
     private static final DateTimeFormatter WEEK_FMT = DateTimeFormatter.ofPattern("MMM d");
 
@@ -89,22 +112,13 @@ class GenerateFutureWeeksIT extends MisePlaywrightIT {
     /** Household seeded per test. */
     private Household household;
 
-    // ── Lifecycle ─────────────────────────────────────────────────────────────
-
-    @Override
-    public String getView() {
-        return "/plan";
-    }
-
     /**
      * Seeds one ACTIVE plan (this week) and one PLANNED plan (next week), then navigates
      * to /plan (the active week) so the header renders with both plans present.
      */
-    @Override
     @BeforeEach
-    public void setupTest() throws Exception {
+    void seedBeforeNavigation() throws Exception {
         seedHousehold();
-        super.setupTest();   // navigates to /plan
     }
 
     @AfterEach
@@ -155,13 +169,14 @@ class GenerateFutureWeeksIT extends MisePlaywrightIT {
      * next chevron ENABLED (UC-010 only disables it when there is no newer plan).
      */
     @Test
-    void activeWeekNextChevronIsEnabledWhenPlannedPlanExists() {
-        // Default navigation lands on the active week (/plan without ?week=)
-        assertThat(page.locator("#mise-week-next")).isVisible();
+    @DisplayName("With a planned week ahead, the next-week button is enabled on the active week")
+    void activeWeekNextChevronIsEnabledWhenPlannedPlanExists(UnifiedPage page) {
+        // when: default navigation lands on the active week (/plan without ?week=)
+        page.navigate(PlanView.class);
 
-        // Next must be enabled — there is one planned plan ahead
-        assertThat(page.locator("#mise-week-next")).not().hasAttribute("disabled", "");
-        assertThat(page.locator("#mise-week-next")).not().hasAttribute("aria-disabled", "true");
+        // then: one planned plan lies ahead
+        assertThat(nextWeekButton(page)).isVisible();
+        assertThat(nextWeekButton(page)).isEnabled();
     }
 
     /**
@@ -169,16 +184,17 @@ class GenerateFutureWeeksIT extends MisePlaywrightIT {
      * The badge must show the planned Monday and carry the mise-week-badge--future class.
      */
     @Test
-    void clickNextNavigatesToPlannedWeekWithFutureBadge() {
-        page.locator("#mise-week-next").click();
+    @DisplayName("Clicking next week opens the planned week, marked as a future week")
+    void clickNextNavigatesToPlannedWeekWithFutureBadge(UnifiedPage page) {
+        // given
+        page.navigate(PlanView.class);
 
-        // Wait for navigation: assert the badge text first
-        String expectedBadge = "Week of " + plannedPlan.getWeekStartDate().format(WEEK_FMT);
-        assertThat(page.locator("#mise-week-badge")).containsText(expectedBadge);
+        // when
+        nextWeekButton(page).click();
 
-        // The badge must carry the future modifier class (the spec'd visual contract)
-        assertThat(page.locator("#mise-week-badge"))
-                .hasClass(Pattern.compile(".*mise-week-badge--future.*"));
+        // then
+        assertThat(weekBadge(page)).hasTextContaining(plannedWeekLabel());
+        assertThat(weekBadge(page).withClassName("mise-week-badge--future")).exists();
     }
 
     /**
@@ -186,33 +202,42 @@ class GenerateFutureWeeksIT extends MisePlaywrightIT {
      * the future badge modifier applied.
      */
     @Test
-    void directNavigateToPlannedWeekShowsFutureBadge() {
-        String plannedMonday = plannedPlan.getWeekStartDate().toString();
-        page.navigate(getUrl() + "/plan?week=" + plannedMonday);
+    @DisplayName("Opening the planned week by URL shows it as a future week")
+    void directNavigateToPlannedWeekShowsFutureBadge(UnifiedPage page) {
+        // when
+        // a path: UnifiedPage.navigate has no Class + query-parameters overload
+        page.navigate("/plan?week=" + plannedPlan.getWeekStartDate());
 
-        // Badge must show the planned Monday
-        String expectedBadge = "Week of " + plannedPlan.getWeekStartDate().format(WEEK_FMT);
-        assertThat(page.locator("#mise-week-badge")).containsText(expectedBadge);
-
-        // Future class must be present
-        assertThat(page.locator("#mise-week-badge"))
-                .hasClass(Pattern.compile(".*mise-week-badge--future.*"));
+        // then
+        assertThat(weekBadge(page)).hasTextContaining(plannedWeekLabel());
+        assertThat(weekBadge(page).withClassName("mise-week-badge--future")).exists();
     }
 
     /**
      * AC: The planned week renders exactly 7 meal-row entries (one per day of the week).
      */
     @Test
-    void directNavigateToPlannedWeekRendersSevenMealRows() {
-        String plannedMonday = plannedPlan.getWeekStartDate().toString();
-        page.navigate(getUrl() + "/plan?week=" + plannedMonday);
+    @DisplayName("The planned week shows a meal for each of the seven days")
+    void directNavigateToPlannedWeekRendersSevenMealRows(UnifiedPage page) {
+        // when
+        // a path: UnifiedPage.navigate has no Class + query-parameters overload
+        page.navigate("/plan?week=" + plannedPlan.getWeekStartDate());
 
-        // Wait for the badge to confirm the right week loaded
-        assertThat(page.locator("#mise-week-badge"))
-                .containsText("Week of " + plannedPlan.getWeekStartDate().format(WEEK_FMT));
+        // then
+        assertThat(weekBadge(page)).hasTextContaining(plannedWeekLabel());
+        assertThat(page.find(UnifiedDiv.class).withTestId("meal-row")).hasCount(7);
+    }
 
-        // Exactly 7 meal rows must be present
-        assertThat(page.getByTestId("meal-row")).hasCount(7);
+    private static UnifiedButton nextWeekButton(UnifiedPage page) {
+        return page.find(UnifiedButton.class).withAccessibleName("Next week");
+    }
+
+    private static UnifiedSpan weekBadge(UnifiedPage page) {
+        return page.find(UnifiedSpan.class).withId("mise-week-badge");
+    }
+
+    private String plannedWeekLabel() {
+        return "Week of " + plannedPlan.getWeekStartDate().format(WEEK_FMT);
     }
 
     /**
@@ -223,6 +248,7 @@ class GenerateFutureWeeksIT extends MisePlaywrightIT {
      * done in @BeforeEach produced the correct data shape in the database.
      */
     @Test
+    @DisplayName("Generating next week creates one planned plan with seven AI-picked meals")
     void generatePlannedWeeksCreatesExactlyOnePlanWithSevenMeals() {
         // The planned plan must have status=PLANNED
         var refreshed = planRepository.findById(plannedPlan.getId()).orElseThrow();

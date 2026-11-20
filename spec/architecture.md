@@ -10,7 +10,7 @@
 
 - **Java 21**
 - **Spring Boot 4.x** — auto-configuration, embedded Tomcat
-- **Vaadin Flow 25.2** with the **Aura theme** — server-side Java UI. Currently `25.2.0` (stable, Maven Central). The AI-powered Charts and Grids preview used by UC-012 first shipped in the 25.2 pre-releases and is now part of the stable line.
+- **Vaadin Flow 25.3** with the **Aura theme** — server-side Java UI. Currently `25.3.5` (stable, Maven Central). The AI-powered Charts and Grids preview used by UC-012 first shipped in the 25.2 pre-releases and is now part of the stable line; since 25.3 the AI components ship as `vaadin-ai-core-flow` + `vaadin-ai-extensions-flow` (pulled in by `vaadin`).
 - **Maven** (wrapper included). Default goal: `spring-boot:run`.
 
 ### AI
@@ -22,7 +22,7 @@
   - `provider.DatabaseProvider` — the AI's SQL surface (`getSchema()` + `executeQuery(sql)`). Implemented by `MiseDatabaseProvider` over the curated reporting snapshot (UC-012); also backs `queryReportingData` for ad-hoc data questions in chat.
   - `grid.GridAIController` + `chart.ChartAIController` — AI-driven Grid and Chart controllers powering the Reports widgets (UC-012). Registered on the orchestrator at build time via `Builder.withController(...)`; their components live in the per-UI `ReportsWidgets` holder and are adopted by `ReportsView` on attach.
   - `common.ChatMessage` — used to serialize and restore conversation history.
-- **Spring AI 2** (`spring-ai-starter-model-openai`; exact version pinned in `pom.xml` as `spring-ai.version`) — provides a `ChatClient`/`ChatModel` configured against any OpenAI-compatible endpoint. Wraps the Qwen local model by default. **Pinned to the release the Vaadin AI components are compiled against** (alpha5 → M4, beta1 → M5, rc1/25.2.0 GA → 2.0.0 GA; check `vaadin-ai-components-flow`'s POM when bumping) — a mismatched release breaks `SpringAILLMProvider` at runtime because advisor builder APIs were renamed between milestones. Spring AI 1.x is incompatible with Spring Boot 4 entirely (references a removed `RestClientAutoConfiguration` class). Bump in lockstep with Vaadin AI releases only.
+- **Spring AI 2** (`spring-ai-starter-model-openai`; exact version pinned in `pom.xml` as `spring-ai.version`) — provides a `ChatClient`/`ChatModel` configured against any OpenAI-compatible endpoint. Wraps the Qwen local model by default. **Pinned to the release the Vaadin AI components are compiled against** (alpha5 → M4, beta1 → M5, rc1/25.2.0 GA → 2.0.0 GA, 25.3.x → 2.0.1; check `vaadin-ai-core-flow`'s POM when bumping) — a mismatched release breaks `SpringAILLMProvider` at runtime because advisor builder APIs were renamed between milestones. Spring AI 1.x is incompatible with Spring Boot 4 entirely (references a removed `RestClientAutoConfiguration` class). Bump in lockstep with Vaadin AI releases only.
 - **Feature flag:** `com.vaadin.experimental.aiComponents=true` in `src/main/resources/vaadin-featureflags.properties`.
 - **Push:** `@Push` on `Application` is required for streaming chat responses.
 
@@ -37,8 +37,7 @@
 ### Testing
 
 - **JUnit 5** (via `spring-boot-starter-test`)
-- **Vaadin Browserless Test framework** (`browserless-test-junit6`) for view tests
-- **DramaFinder + Microsoft Playwright** (test scope, opt-in via the `-Pit` Maven profile) for end-to-end browser tests. ITs live in `src/test/java/com/example/mise/it/*IT.java`, extend `MisePlaywrightIT` (Spring Boot + DramaFinder `AbstractBasePlaywrightIT`), run headless by default, and isolate themselves from the dev DB via an in-memory H2 in `src/test/resources/application-it.properties`. Accidental LLM calls during tests fail fast (endpoint pointed at `http://127.0.0.1:1`).
+- **Unified Testing Tool** (`org.vaadin.addons:unified-test-*`, test scope, versions from `unified-test-bom`) — UI tests are Unified UI Tests: one source, run on **Browserless** (in-JVM, default) and **Playwright** (real headless Chromium). `*IT.java` under `src/test/java/com/example/mise/it/` are `@UnifiedSpringBootTest` + `@ActiveProfiles("it")` + `@Import(TestAiConfig.class)` and take a `UnifiedPage`; `-Pit` runs them on both tools; tests that need a real browser declare `@RequiresTestingTool(PLAYWRIGHT)`. In-memory H2 via `application-it.properties`; accidental LLM calls fail fast (endpoint `http://127.0.0.1:1`). Style enforced by `UnifiedStyleTest` (unified-test-archunit).
 - **Playwright MCP** for visual verification (see `verification.md`)
 
 ---
@@ -282,9 +281,9 @@ Tools are plain Spring beans whose methods carry `@org.springframework.ai.tool.a
 ```bash
 ./mvnw                            # dev mode (default goal: spring-boot:run)
 ./mvnw clean package              # production build (JAR in target/)
-./mvnw test                       # unit + browserless-component tests
+./mvnw test                       # unit + Browserless tests (+ Unified style rules)
 ./mvnw test -Dtest=ClassName      # single test class
-./mvnw -Pit verify                # *IT.java browser tests (headless, opt-in)
+./mvnw -Pit verify                # *IT.java UI tests on Playwright (headless) and Browserless (opt-in)
 ./mvnw -Pit verify -Dit.test=X    # single IT class
 ```
 

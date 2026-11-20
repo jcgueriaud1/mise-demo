@@ -75,15 +75,18 @@ The same `MISE_MODEL_*` / `PORT` variables as the Docker run apply (including th
 
 ### Integration (browser) tests
 
-End-to-end tests live next to the unit tests in `src/test/java/.../it/` and are named `*IT.java`. They run a real Chromium under [Microsoft Playwright](https://playwright.dev/java/) against a real Spring Boot server, using [DramaFinder](https://github.com/parttio/dramafinder) wrappers for Vaadin component locators. They are **opt-in via the `it` Maven profile** so plain `./mvnw test` stays fast.
+End-to-end tests live next to the unit tests in `src/test/java/.../it/` and are named `*IT.java`. They are **Unified UI Tests** ([unified-testing-tool](https://github.com/parttio/unified-testing-tool)): one test source that runs both on a real Chromium under [Microsoft Playwright](https://playwright.dev/java/) against a real Spring Boot server, and on Browserless inside the JVM. The `it` profile runs every IT on both; tests that need a real browser (computed CSS, scrolling, the page title) declare it and are skipped on Browserless. They are **opt-in via the `it` Maven profile** so plain `./mvnw test` stays fast. Each run writes readable User Steps per test, a `summary.md` and a `report.html` under `target/failsafe-reports/<tool>/unified-evidence/`.
 
 ```bash
 # one-time per machine: download the Chromium browser
 ./mvnw exec:java -Dexec.mainClass=com.microsoft.playwright.CLI \
     -Dexec.args="install chromium" -Dexec.classpathScope=test
 
-# run all IT tests (headless — works in CI, dev containers, anywhere)
+# run all IT tests on Playwright (headless — works in CI, dev containers, anywhere) and on Browserless
 ./mvnw -Pit verify
+
+# one Testing Tool only
+./mvnw -Pit verify -Dskip.it.browserless=true
 
 # run a single IT test
 ./mvnw -Pit verify -Dit.test=HomeViewIT
@@ -176,4 +179,5 @@ This project is licensed under the [Apache License 2.0](LICENSE.md).
 Third-party material (see [NOTICE.md](NOTICE.md) for details):
 
 - **Logo & icons** — the Mise logo is the [`tools-kitchen-2`](https://tabler.io/icons/icon/tools-kitchen-2) icon from [Tabler Icons](https://tabler.io/icons) by Paweł Kuna, licensed under the [MIT License](https://github.com/tabler/tabler-icons/blob/main/LICENSE). The design mockups also use Tabler outline icons.
-- **DramaFinder** — Playwright element wrappers for Vaadin from [parttio/dramafinder](https://github.com/parttio/dramafinder) (Apache 2.0), used as a test dependency; parts of its documentation are vendored into the [`vaadin-playwright-test`](.claude/skills/vaadin-playwright-test/) skill.
+- **Unified Testing Tool** — the Unified API for Vaadin UI tests from [parttio/unified-testing-tool](https://github.com/parttio/unified-testing-tool) (Apache 2.0), used as a test dependency; its migration recipe installed the [`write-unified-ui-tests`](.claude/skills/write-unified-ui-tests/) skill.
+- **DramaFinder** — Playwright element wrappers for Vaadin from [parttio/dramafinder](https://github.com/parttio/dramafinder) (Apache 2.0), used transitively by the Unified API's Playwright adapter; parts of its documentation are vendored into the [`vaadin-playwright-test`](.claude/skills/vaadin-playwright-test/) skill.

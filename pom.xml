@@ -9,16 +9,18 @@
     
     <properties>
         <java.version>21</java.version>
-        <vaadin.version>25.2.6</vaadin.version>
+        <vaadin.version>25.3.5</vaadin.version>
         <!-- Vaadin AI components are built against a specific Spring AI milestone
              (alpha5 -> M4, beta1 -> M5, rc1/25.2.0 GA -> 2.0.0 GA). Keep this
              aligned with what the vaadin-ai-components-flow POM for
              ${vaadin.version} declares; a mismatched milestone can break
              SpringAILLMProvider at runtime (advisor builder APIs were renamed
              between milestones).
-             Vaadin 25.2.0 (stable) declares Spring AI 2.0.0 GA, so we track GA here —
-             verified across all three test layers (unit/browserless, Playwright
-             IT, and the live-LLM AIIT suite).
+             Vaadin 25.2.0 (stable) declared Spring AI 2.0.0 GA. Vaadin 25.3.x ships the
+             AI components as vaadin-ai-core-flow + vaadin-ai-extensions-flow
+             (vaadin-ai-components-flow stops at 25.2.x); 25.3.5 declares Spring AI
+             2.0.1, which is what we pin. 25.3 also changed the AIController
+             callbacks to take RequestEvent / ResponseEvent.
              Gotcha: GA adds an <exclusion> for
              tools.jackson.dataformat:jackson-dataformat-yaml on its
              spring-ai-client-chat -> json-schema-validator dependency (M5 left it
@@ -51,6 +53,13 @@
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
+            <dependency>
+                <groupId>org.vaadin.addons</groupId>
+                <artifactId>unified-test-bom</artifactId>
+                <version>0.1.0-alpha3</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
         </dependencies>
     </dependencyManagement>
     
@@ -74,23 +83,44 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
-        <dependency>
-            <groupId>com.vaadin</groupId>
-            <artifactId>browserless-test-junit6</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <!-- Spring integration for Browserless: SpringBrowserlessTest, route+bean wiring. -->
+        <!-- Unified UI Tests (org.vaadin.addons:unified-test-*, versions from unified-test-bom):
+             one test source runs on Browserless (default) or Playwright
+             (-Dvaadin.testing.tool=playwright). Spring integration for the Browserless runs;
+             version managed by the BOMs. -->
         <dependency>
             <groupId>com.vaadin</groupId>
             <artifactId>browserless-test-spring</artifactId>
-            <version>1.1.2</version>
             <scope>test</scope>
         </dependency>
-        <!-- DramaFinder: Playwright element wrappers for Vaadin. Activated via -Pit. -->
+        <!-- Workaround for unified-test-spring 0.1.0-alpha3: @UnifiedSpringBootTest always imports
+             TestLoginConfiguration, whose condition loads a class with Spring Security types in its
+             signatures, so without Spring Security every context fails with NoClassDefFoundError
+             org/springframework/security/core/Authentication. Core only: Spring Boot 4 auto-configures
+             security from spring-boot-security, which this app doesn't use. -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-core</artifactId>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>org.vaadin.addons</groupId>
-            <artifactId>dramafinder</artifactId>
-            <version>1.2.0</version>
+            <artifactId>unified-test-browserless</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.vaadin.addons</groupId>
+            <artifactId>unified-test-playwright</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.vaadin.addons</groupId>
+            <artifactId>unified-test-spring</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- Unified UI Test style rules (ArchUnit), checked by UnifiedStyleTest. -->
+        <dependency>
+            <groupId>org.vaadin.addons</groupId>
+            <artifactId>unified-test-archunit</artifactId>
             <scope>test</scope>
         </dependency>
 
@@ -177,30 +207,34 @@
     </pluginRepositories>
 
     <profiles>
-        <!-- ./mvnw -Pit verify  -> runs *IT.java end-to-end (headless Playwright). -->
+        <!--
+            ./mvnw -Pit verify  -> runs the *IT.java Unified UI Tests twice, one failsafe execution per
+            Testing Tool:
+              it-playwright   - real headless Chromium (vaadin.testing.tool=playwright); every IT runs.
+              it-browserless  - in-JVM Browserless (vaadin.testing.tool=browserless); tests that still
+                                need a browser declare @RequiresTestingTool(PLAYWRIGHT) and are skipped.
+            Each execution keeps its own reports, failsafe summary and Unified evidence
+            (user-steps.txt, summary.md, report.html) under target/failsafe-reports/<tool>/.
+            Scope one tool / class: -Dit.test=PlanViewIT, or skip a tool with
+            -Dskip.it.browserless / -Dskip.it.playwright.
+        -->
         <profile>
             <id>it</id>
             <properties>
                 <headless>true</headless>
+                <skip.it.playwright>false</skip.it.playwright>
+                <skip.it.browserless>false</skip.it.browserless>
             </properties>
             <build>
                 <plugins>
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-failsafe-plugin</artifactId>
-                        <executions>
-                            <execution>
-                                <goals>
-                                    <goal>integration-test</goal>
-                                    <goal>verify</goal>
-                                </goals>
-                            </execution>
-                        </executions>
                         <configuration>
                             <!--
                                 Failsafe's default include is **/*IT.java, which also matches
                                 **/*AIIT.java (the suffix `IT.java` is a substring of `AIIT.java`).
-                                Exclude AIIT explicitly so -Pit runs Playwright ITs only — AIIT
+                                Exclude AIIT explicitly so -Pit runs the UI ITs only — AIIT
                                 stays gated behind -Pai-it where the live LLM endpoint is wired.
                             -->
                             <excludes>
@@ -208,10 +242,51 @@
                             </excludes>
                             <!-- Manual-example release-gate ITs are opt-in (-Pmanual-verify); never in -Pit. -->
                             <excludedGroups>manual-example</excludedGroups>
-                            <systemPropertyVariables>
-                                <headless>${headless}</headless>
-                            </systemPropertyVariables>
                         </configuration>
+                        <executions>
+                            <!-- spring-boot-starter-parent declares a `default` failsafe execution; without a
+                                 Testing Tool it would run every IT a third time on Browserless. -->
+                            <execution>
+                                <id>default</id>
+                                <configuration>
+                                    <skip>true</skip>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>it-playwright</id>
+                                <goals>
+                                    <goal>integration-test</goal>
+                                    <goal>verify</goal>
+                                </goals>
+                                <configuration>
+                                    <skip>${skip.it.playwright}</skip>
+                                    <reportsDirectory>${project.build.directory}/failsafe-reports/playwright</reportsDirectory>
+                                    <summaryFile>${project.build.directory}/failsafe-reports/playwright/failsafe-summary.xml</summaryFile>
+                                    <systemPropertyVariables>
+                                        <vaadin.testing.tool>playwright</vaadin.testing.tool>
+                                        <vaadin.testing.playwright.headless>${headless}</vaadin.testing.playwright.headless>
+                                        <vaadin.testing.playwright.trace>on-failure</vaadin.testing.playwright.trace>
+                                        <vaadin.testing.evidence-dir>${project.build.directory}/failsafe-reports/playwright/unified-evidence</vaadin.testing.evidence-dir>
+                                    </systemPropertyVariables>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>it-browserless</id>
+                                <goals>
+                                    <goal>integration-test</goal>
+                                    <goal>verify</goal>
+                                </goals>
+                                <configuration>
+                                    <skip>${skip.it.browserless}</skip>
+                                    <reportsDirectory>${project.build.directory}/failsafe-reports/browserless</reportsDirectory>
+                                    <summaryFile>${project.build.directory}/failsafe-reports/browserless/failsafe-summary.xml</summaryFile>
+                                    <systemPropertyVariables>
+                                        <vaadin.testing.tool>browserless</vaadin.testing.tool>
+                                        <vaadin.testing.evidence-dir>${project.build.directory}/failsafe-reports/browserless/unified-evidence</vaadin.testing.evidence-dir>
+                                    </systemPropertyVariables>
+                                </configuration>
+                            </execution>
+                        </executions>
                     </plugin>
                 </plugins>
             </build>
@@ -304,7 +379,9 @@
                             <forkCount>1</forkCount>
                             <reuseForks>true</reuseForks>
                             <systemPropertyVariables>
-                                <headless>${headless}</headless>
+                                <!-- the Playwright+live-LLM ManualExamples*IT are Unified UI Tests; the AIITs ignore it -->
+                                <vaadin.testing.tool>playwright</vaadin.testing.tool>
+                                <vaadin.testing.playwright.headless>${headless}</vaadin.testing.playwright.headless>
                                 <miseit.forkNumber>${surefire.forkNumber}</miseit.forkNumber>
                             </systemPropertyVariables>
                         </configuration>

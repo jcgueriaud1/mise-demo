@@ -7,7 +7,9 @@ metadata:
   originSessionId: 4878e101-3f89-431f-ba3c-67e683989ad5
 ---
 
-**DramaFinder** — Playwright utility classes for Vaadin, by parttio (JC Gueriaud).
+> **Pre-migration.** Since 2026-11-19 Mise's UI tests are Unified UI Tests ([[reference-unified-testing]]); DramaFinder 2.2.0 now arrives transitively through `unified-test-playwright` and is used only behind Playwright Escape Hatches.
+
+**DramaFinder** — Playwright utility classes for Vaadin, by parttio.
 
 - Repo: https://github.com/parttio/dramafinder
 - Released coordinates (test scope):
