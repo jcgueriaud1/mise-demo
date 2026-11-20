@@ -115,13 +115,17 @@ class OnboardingViewIT {
 
         // when
         page.find(UnifiedMessageInput.class).send("Two adults, no allergies, €80/week");
-        // the assistant reply has landed, so onResponseComplete has flushed to the repository
         page.waitUntil(() -> messages.getMessageCount() == 3);
 
-        // then
-        long onboardingCount = conversationMessageRepository.findAll().stream()
+        // then: onResponseComplete persists the turn after the reply is rendered, so the rows
+        // can still be missing when the UI shows it: wait for them, not for the UI
+        page.waitUntil(() -> onboardingRowCount() > 0);
+        Assertions.assertThat(onboardingRowCount()).isGreaterThan(0);
+    }
+
+    private long onboardingRowCount() {
+        return conversationMessageRepository.findAll().stream()
                 .filter(m -> m.getViewContext() == ConversationMessage.ViewContext.ONBOARDING)
                 .count();
-        Assertions.assertThat(onboardingCount).isGreaterThan(0);
     }
 }

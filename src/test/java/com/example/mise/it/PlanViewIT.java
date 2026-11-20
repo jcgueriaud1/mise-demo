@@ -217,11 +217,13 @@ class PlanViewIT {
         sendChatMessage(page, "What's on Friday?");
         waitForChatMessages(page, 2);
 
-        // then: both the user and assistant messages are stamped PLAN
-        var rows = conversationMessageRepository.findAll();
-        Assertions.assertThat(rows)
-                .filteredOn(r -> r.getViewContext() == ConversationMessage.ViewContext.PLAN)
-                .hasSizeGreaterThanOrEqualTo(2);
+        // then: both the user and assistant messages are stamped PLAN.
+        // The response listener persists the turn (one transaction) after the reply is rendered,
+        // so the rows can still be missing when the UI shows it: wait for them, not for the UI.
+        page.waitUntil(() -> planConversationRows().size() >= 2);
+        Assertions.assertThat(planConversationRows())
+                .extracting(ConversationMessage::getRole)
+                .contains(ConversationMessage.Role.USER, ConversationMessage.Role.ASSISTANT);
     }
 
     // ── UC-003 tests ──────────────────────────────────────────────────────────
@@ -534,6 +536,12 @@ class PlanViewIT {
 
     private static void sendChatMessage(UnifiedPage page, String message) {
         page.find(UnifiedContainer.class).withTestId("chat-dock").find(UnifiedMessageInput.class).send(message);
+    }
+
+    private List<ConversationMessage> planConversationRows() {
+        return conversationMessageRepository.findAll().stream()
+                .filter(r -> r.getViewContext() == ConversationMessage.ViewContext.PLAN)
+                .toList();
     }
 
     private static UnifiedMessageList waitForChatMessages(UnifiedPage page, int count) {

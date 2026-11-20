@@ -522,3 +522,11 @@ Along the way:
 - A negative check confirmed the Browserless branch runs: a deliberately wrong expected size failed it.
 
 **Result** (`./mvnw -Pit verify -Dit.test=ChatDockIT` + `UnifiedStyleTest`): Playwright 3/3 ✓, Browserless 3/3 ✓ (was 1 + 2 skipped), style ✓.
+
+## Follow-up: flaky persistence checks (2026-11-20)
+
+`PlanViewIT.conversationPersistedWithPlanViewContext` failed now and then, with 0 rows where it expected 2 or more. It waited for the chat reply in the UI and then read the repository at once. The rows are written by the orchestrator's response listener (`syncFromOrchestrator`, one transaction), which can finish after the reply is already rendered. `OnboardingViewIT.messagesPersistedWithOnboardingViewContext` had the same race, and a comment that wrongly said the reply landing meant the rows were flushed.
+
+Both tests now `page.waitUntil(..)` on the persisted rows themselves. The PLAN test also checks that a USER row and an ASSISTANT row are both there. **Result:** both classes ran 3 times on both tools, 23/23 each time.
+
+Side note: without `clean`, failsafe merged the per-tool `failsafe-summary.xml` from the previous run, so a fixed run still reported the old failures and failed the build. Run `clean`, or delete `target/failsafe-reports/*/failsafe-summary.xml`, between runs.
