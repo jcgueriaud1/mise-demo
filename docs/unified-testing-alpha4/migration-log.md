@@ -328,3 +328,23 @@ Also:
 - A User Step now reads `see grid (test id “leaderboard-grid”) without column “Cooked times”`.
 
 All 11 tests run everywhere. **Browserless 11 ✓, Playwright 11 ✓.** alpha3 kept this class's title and column-header checks behind the Escape Hatch or `waitUntil` (F21, F22).
+
+### 7e: ChatDockIT, ChatBusyStopIT (53 markers → 2 kept)
+
+Most markers here were `waitForFunction(..)` / `evaluate(..)` JavaScript on computed CSS, CSS classes and DOM text, plus the dock-scoped `MessageInputElement.get(getByTestId("chat-dock"))` that the recipe doesn't convert (G5).
+
+| Marker(s) | Outcome |
+|---|---|
+| `getByTestId("chat-dock")` + `MessageInputElement.get(chatDock)` + `typeAndSubmit` / `focus()` | **Resolved**: `page.find(UnifiedContainer.class).withTestId("chat-dock").find(UnifiedMessageInput.class)` + `send(..)` / `element().focus()` (the F27 fix: focus reaches the input part on Playwright) |
+| `waitForFunction`/`evaluate` `classList.contains('ai-working')` (10) | **Resolved**: `assertThat(dock.withClassName("ai-working")).exists()` / `.doesNotExist()`, a retrying filter on a class the server toggles |
+| `getByTestId("chat-busy-note")` + JS `display !== 'none'` + `containsText` (6) | **Resolved**: `assertThat(page.find(UnifiedSpan.class).withTestId("chat-busy-note")).isVisible().hasTextContaining(..)`; cleared → `isHidden()` (the note uses `setVisible`) |
+| JS over `vaadin-message` text: echo absent, partial chunk, `(stopped)` (5) | **Resolved**: `hasMessageContaining(..)` to wait, then AssertJ `noneMatch` / `anyMatch` over `getMessageTexts()` for the "absent" and "both in one message" checks (G10) |
+| computed `max-height` of `.mise-chat-history` and `display` of the preview (8) | **Resolved, on a browser**: `assertThat(history).hasCssValue("max-height", "0px")`, `assertThat(preview).isVisible()` / `isHidden()`, and `page.waitUntil(() -> getCssValue("max-height") > 100)` for the expanded state, under `@RequiresBrowser` (runs on Playwright and Selenium) |
+| `scrollTop = 0` and "scrolled to the bottom" (4) | **Kept** (2 remaining Escape Hatch statements): `// Escape Hatch kept: JavaScript, the Unified API can neither set nor read a scroll position`, under `@RequiresTestingTool(PLAYWRIGHT)` |
+
+| Class | Runs everywhere | Browser only | Playwright only |
+|---|---|---|---|
+| `ChatBusyStopIT` | 3/3 | | |
+| `ChatDockIT` | 1/3 (`.ai-working`) | 1 (`@RequiresBrowser`, CSS) | 1 (scroll JS) |
+
+Two runs in a row: **Browserless 4 ✓ + 2 skipped, Playwright 6 ✓**. alpha3 ran `ChatBusyStopIT` on Browserless too, but needed its own `UnifiedMessageInput` / `UnifiedMessageList` Wrappers and `tryUnwrap` branches for the dock (F26, F27). Here the shipped Wrappers and `@RequiresBrowser` cover it without either.
