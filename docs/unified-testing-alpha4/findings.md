@@ -61,6 +61,15 @@ On the first Browserless run, `OnboardingViewIT` failed with `Expected exactly o
 The checks are `hasMessageCount`, `hasMessageContaining` (any message), `hasMessageTexts` (all texts, exactly) and `isEmpty`. A chat test usually means "the user's message, then the assistant's reply containing X". Mise's ITs checked `getMessage(1)` and `getMessage(2)` with `containsText(..)`. `hasMessageTexts` needs every full text, including a long seeded greeting, and `hasMessageContaining` loses the order and who said it. So the test waits on `hasMessageCount(3)` and then reads `getMessageTexts().get(i)` once. That works, but the reads leave no `see` line in `user-steps.txt`.
 **Suggestion:** `hasMessage(int index, String containing)` or `hasLastMessageContaining(..)`, and/or a check on `Message.userName()`, like `hasMessageFrom("Mise", containing)`.
 
+### G11: There's no way to pick a date in a date picker's overlay when its field is hidden. Verified
+
+Mise's week picker is a `DatePicker` whose text field is hidden by CSS; the badge opens its calendar overlay, and the user picks a day there. `UnifiedDatePicker.setValue(..)` / `typeText(..)` act on the field. That is correct on Playwright, which refuses (`found 1, but hidden`), and wrong on Browserless, which passes (F24). No Unified call picks a day in the overlay. What works on both tools is `picker.element().setProperty("value", "2026-11-11")`, which is what the pick does underneath, wrapped in a named `page.step(..)`.
+**Suggestion:** `UnifiedDatePicker.pick(LocalDate)` (or `selectDate`), which opens the overlay if needed and clicks the day as a user would on browser tools. On Browserless it could set the value and check the picker is `opened`.
+
+### G12: "Compared with Browserless" names a Browserless-only pass at once. Verified · positive
+
+The first version of the picker test passed on Browserless and failed on Playwright. The Playwright run's `summary.md` (from `compare-dir`, set up in step 6) gave the two scenarios that "end differently", the step where the runs part, and the Playwright error. alpha3's F24 found the same class of problem by reasoning after the fact. Here it was the first thing the run reported. The two runs in one `mvn verify`, with the comparison, are worth their setup.
+
 ## alpha3 findings re-checked
 
 | alpha3 | Status in alpha4 | Evidence |
@@ -78,5 +87,9 @@ The checks are `hasMessageCount`, `hasMessageContaining` (any message), `hasMess
 | F15 | **Fixed**: pointer in `CLAUDE.md` | step 4 |
 | F18 | **Fixed** (documented, copy-paste snippet with compare-dir) | step 6 |
 | F19 | **Fixed**: comments stay above the statement | step 4 |
+| F21 | **Fixed**: `assertThat(page).hasTitle(..)` on every tool | 7a, 7d, 7f, 7g |
+| F22 | **Fixed**: `hasColumn` / `doesNotHaveColumn` | 7d |
+| F23 | **Fixed**: `UnifiedDiv.click()` | 7h |
+| F24 | Still true (by design); now flagged by the cross-tool comparison | G11, G12 |
 | F20 | Still true (positive), and alpha4's server-log lines make it fast to diagnose | G9 |
 | F25 | **Fixed** for `getView()`; `getUrl()` paths stay strings | G7 |

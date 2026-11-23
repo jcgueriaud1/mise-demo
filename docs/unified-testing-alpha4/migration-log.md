@@ -393,3 +393,29 @@ All 19 tests run everywhere. **Browserless 18 ✓ + 1 plain JUnit, Playwright 18
 The "absent" checks (`olive oil` suppressed) now assert first that rows exist, so they can't pass on a list that hasn't rendered yet.
 
 All 12 tests run everywhere. **Browserless 12 ✓, Playwright 12 ✓.** The old test needed a hand-written `waitForTimeout` polling loop because it flaked; Auto-Wait removed the need.
+
+### 7h: WeekNavigationIT (39 markers → 0)
+
+| Marker(s) | Outcome |
+|---|---|
+| `hasAttribute("disabled", "")` / `not().hasAttribute("disabled" / "aria-disabled")` on `#mise-week-prev/next` (8) | **Resolved**: `assertThat(prevWeek).isEnabled()` / `isDisabled()`, with the icon buttons found by `withAccessibleName("Previous week" / "Next week")` |
+| `locator("#mise-week-badge")).containsText(..)` (21) | **Resolved**: `UnifiedSpan.withId("mise-week-badge")` + `hasTextContaining(badgeFor(plan))` |
+| `playwright.url()` contains `week=…` / doesn't (5) | **Resolved**: `assertThat(page).hasQueryParameter("week", monday)` / `hasQueryParameter("week", null)` |
+| `locator("vaadin-date-picker-overlay")).isVisible()` (3) | **Resolved**: `assertThat(picker).hasProperty("opened", true)`. The badge's click listener calls `weekPicker.open()`, so the property is set on every tool |
+| `locator("#mise-week-datepicker").evaluate("picker.value = …")` (2) | **Resolved**: a `pickDate(..)` User Task, `picker.element().setProperty("value", iso)`. See below |
+| `waitForTimeout(500)` + URL unchanged | **Resolved**: `assertThat(page).isAt(PlanView.class).hasQueryParameter("week", same)` + the badge. This is slightly weaker, because it doesn't wait 500 ms for a navigation that shouldn't happen |
+| `locator(".mise-tab").filter(hasText "Shopping").click()` + `hasTitle` + URL | **Resolved**: `page.find(UnifiedDiv.class).withClassName("mise-tab").withText("Shopping").click()` (alpha4's `click()` on `UnifiedDiv`, F23), then `assertThat(page).isAt(ShoppingView.class).hasTitle(..).hasQueryParameter(..)` |
+| `getByTestId("meal-row")).hasCount(7)` | **Resolved**: `UnifiedDiv.withTestId(..)` + `hasCount(7)` |
+| `page.navigate("plan?week=" + …)` / `playwright.reload()` | **Resolved**: `navigate(PlanView.class, QueryParameters)` / `page.reload()` |
+
+**The date picker, and what the cross-tool comparison showed.** I first wrote the pick as `UnifiedDatePicker.setValue(date)`. Browserless passed 13/13. Playwright failed 2 tests with `Expected a visible and enabled date picker (id “mise-week-datepicker”), found 1, but hidden`: the view hides the picker's text field with CSS, and users only ever see the calendar overlay. The Playwright `summary.md` explained it in its **Compared with Browserless** section without a second look:
+
+```text
+13 scenarios ran on both Testing Tools: 2 end differently, 0 take different User Steps.
+**Picking a Wednesday shows the week starting that Monday** · failed on Playwright, passed on Browserless
+- Parts at step 5: no more steps on Playwright, `see span … “Week of Nov 9”` on Browserless
+```
+
+That is alpha3's F24 (Browserless lets a test do what a user can't, because it has no CSS), caught on the first run, not by reasoning. The overlay's calendar has no Wrapper (G11), so the pick now sets the picker's `value` property through `element().setProperty(..)`. It's what the old JavaScript did, and it works on both tools. A `page.step("Pick 2026-11-11 in the week picker", ..)` keeps it readable.
+
+All 13 tests run everywhere. **Browserless 13 ✓, Playwright 13 ✓.**
