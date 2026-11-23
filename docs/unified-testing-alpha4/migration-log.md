@@ -294,3 +294,19 @@ All 10 markers were `MessageListElement.get(playwright)` with `assertMessageCoun
 I also changed the persistence check. It read the repository once, right after the UI showed the reply. The response listener stores the turn *after* rendering, so a single read races on Playwright. It's now `page.step("The conversation is stored as onboarding", () -> page.waitUntil(..))`, and `user-steps.txt` shows it as a named step with "… 1 call outside the Unified API (waitUntil)".
 
 All 4 tests run everywhere. **Browserless 4 ✓, Playwright 4 ✓.**
+
+### 7c: GenerateFutureWeeksIT (8 markers → 0)
+
+| Marker(s) | Outcome |
+|---|---|
+| `not().hasAttribute("disabled")` + `not().hasAttribute("aria-disabled", "true")` on `#mise-week-next` | **Resolved**: `assertThat(nextWeek).isVisible().isEnabled()`, with the icon button found by `withAccessibleName("Next week")` (its `aria-label`) rather than its id |
+| `containsText("Week of …")` on `#mise-week-badge` (3) | **Resolved**: `assertThat(page.find(UnifiedSpan.class).withId("mise-week-badge")).hasTextContaining(..)` |
+| `hasClass(".*mise-week-badge--future.*")` (2) | **Resolved**: `assertThat(badge.withClassName("mise-week-badge--future")).exists()`, a retrying filter instead of a class check |
+| `getByTestId("meal-row")).hasCount(7)` | **Resolved**: `page.find(UnifiedContainer.class).withTestId("meal-row")` + `hasCount(7)` |
+
+Also changed:
+- `page.navigate("plan?week=" + monday)` → `page.navigate(PlanView.class, QueryParameters.of("week", ..))`, new in alpha4 (F25). The User Step reads `open Plan with “week=2026-11-30”`.
+- The recipe had put `page.navigate(PlanView.class)` at the start of every test, as `getView()` used to. That was redundant before a direct `?week=` navigation, so I removed it.
+- The repository-only test lost its unused `UnifiedPage` parameter, so it no longer counts as a "scenario without a check".
+
+**Browserless 4 ✓, Playwright 4 ✓** (+1 plain JUnit test). alpha3 kept no Escape Hatch here either, but needed `page.navigate("plan?week=…")` strings (F25).
