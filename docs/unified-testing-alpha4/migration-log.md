@@ -310,3 +310,21 @@ Also changed:
 - The repository-only test lost its unused `UnifiedPage` parameter, so it no longer counts as a "scenario without a check".
 
 **Browserless 4 ✓, Playwright 4 ✓** (+1 plain JUnit test). alpha3 kept no Escape Hatch here either, but needed `page.navigate("plan?week=…")` strings (F25).
+
+### 7d: ReportsViewIT (14 markers → 0)
+
+| Marker(s) | Outcome |
+|---|---|
+| `hasTitle("Mise — Reports")` | **Resolved**: `assertThat(page).hasTitle(..)` |
+| `getByTestId("leaderboard-grid")` + `locator("vaadin-grid-cell-content").count() ≥ 1` | **Resolved**: `page.find(UnifiedGrid.class).withTestId("leaderboard-grid")`, then `assertThat(grid.row(0)).exists()` |
+| `getByTestId("leaderboard-grid").getByText("Cooked times" / "kcal per euro")).isVisible()` (5) | **Resolved**: `assertThat(grid).hasColumn(..)`, new in alpha4 (F22) |
+| `…getByText("Cooked times")).not().isVisible()` + `getByText("Times")).isVisible()` | **Resolved**: `assertThat(grid).doesNotHaveColumn("Cooked times").hasColumn("Times")` |
+| `getByTestId("report-reset-…")).isAttached()` (3) | **Resolved**: `page.find(UnifiedButton.class).withAccessibleName("Revert <widget> to defaults")` + `exists()`, by the `aria-label` the user's screen reader announces rather than the test id |
+
+Also:
+- `page.navigate("reports")` used as a reload is now `page.reload()`.
+- The recipe had written `UnifiedContainer.withTestId("leaderboard-grid")` with **no** marker, though the test id is set on a `Grid` in `ReportsWidgets` (not a `@Route` view). It's now `UnifiedGrid`.
+- The two Chart widgets stay `UnifiedContainer.withTestId(..)`, because Charts has no Wrapper.
+- A User Step now reads `see grid (test id “leaderboard-grid”) without column “Cooked times”`.
+
+All 11 tests run everywhere. **Browserless 11 ✓, Playwright 11 ✓.** alpha3 kept this class's title and column-header checks behind the Escape Hatch or `waitUntil` (F21, F22).
