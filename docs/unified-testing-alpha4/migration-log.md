@@ -260,3 +260,22 @@ The new Findable View (`….view.txt`) was written too: `Findable view of “/we
 The Playwright `summary.md` now reads: *"Compared with Browserless: 10 scenarios ran on both Testing Tools: same result and same User Steps on each. 64 ran on Playwright only. Both runs are of commit `a61afe0`, with the same uncommitted changes."*
 
 **How it went (about 20 minutes):** the build config was a copy-paste from the guide; alpha3 had to discover it. The time went into the app bug, and that took one read of `user-steps.txt`. alpha3 found its Browserless-only app bug (F20) later and by debugging.
+
+---
+
+## Step 7: Resolve the Migration Markers (2026-11-23)
+
+`resolve-migration-markers` still has `disable-model-invocation: true` (G1), so I followed its written procedure by hand, as in alpha3: one class at a time, each class run on Browserless **and** Playwright before the next. The skill's "prove it" commands are `mvn test -Dtest=<Class>`, which runs surefire. Mise's `*IT` classes run under failsafe, so each class runs with `./mvnw -Pit verify -Dit.test=<Class>`, which does both tools in one go thanks to step 6. I also give each test its `@DisplayName` and given/when/then shape as I go, so step 8's style rules shouldn't need a second pass over the files.
+
+The tools used for each marker: the bundled `META-INF/unified/api-reference.md` (new in alpha4; one page listing every Wrapper's filters, actions, reads and checks), the `write-unified-ui-tests` skill's canonical forms, and the `unified-test-api` sources jar when the reference is too brief.
+
+### 7a: HomeViewIT, OnboardingRedirectIT (4 markers → 0)
+
+| Marker | Outcome |
+|---|---|
+| `assertThat(playwright).hasTitle("Mise — Debug")` | **Resolved**: `assertThat(page).hasTitle(..)`, new in alpha4 (F21) |
+| `getByRole(HEADING).filter(hasText ..)` | **Resolved**: `page.findComponent(H2.class).withText(..)` (no `UnifiedH2`; `UnifiedGenericComponent` has `withText`, though the API reference lists only "the filters of every Wrapper" for it) |
+| `getByText("Stored messages:")` | **Resolved**: `page.find(UnifiedSpan.class).withTextContaining(..)` |
+| `hasURL(".*/plan.*")` | **Resolved**: `assertThat(page).isAt(PlanView.class)` |
+
+All four tests dropped `@RequiresTestingTool(PLAYWRIGHT)`. **Browserless 4 ✓, Playwright 4 ✓.** I also renamed `OnboardingRedirectIT`'s `setupTest()` to `seedHousehold()`, since its "overrides the base class" comment no longer applied. In alpha3 these two classes needed the Escape Hatch kept for the title check (F21).

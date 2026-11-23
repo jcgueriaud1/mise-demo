@@ -6,14 +6,13 @@ import com.example.mise.domain.household.HouseholdService;
 import com.example.mise.it.support.TestAiConfig;
 import com.example.mise.it.support.TestChatModel;
 import com.example.mise.ui.onboarding.OnboardingView;
+import com.example.mise.ui.plan.PlanView;
 
-import com.microsoft.playwright.Page;
-import com.vaadin.testing.unified.RequiresTestingTool;
-import com.vaadin.testing.unified.TestingTool;
 import com.vaadin.testing.unified.UnifiedPage;
 import com.vaadin.testing.unified.spring.UnifiedSpringBootTest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
@@ -21,9 +20,8 @@ import org.springframework.test.context.ActiveProfiles;
 
 import java.math.BigDecimal;
 import java.util.List;
-import java.util.regex.Pattern;
 
-import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
+import static com.vaadin.testing.unified.assertion.UnifiedAssertions.assertThat;
 
 /**
  * BR-01: If a {@link Household} row already exists, navigating to {@code /welcome} must
@@ -63,12 +61,9 @@ class OnboardingRedirectIT {
     @Autowired
     private HouseholdRepository householdRepository;
 
-    /**
-     * Override: seed the Household before the base class navigates to /welcome.
-     * The base @BeforeEach on the same method name is hidden by this override in JUnit 5.
-     */
+    /** Seed the Household before the test navigates to /welcome. */
     @BeforeEach
-    public void setupTest() throws Exception {
+    void seedHousehold() {
         Household h = new Household();
         h.setName("IT Seed Household");
         h.setSize(2);
@@ -87,11 +82,10 @@ class OnboardingRedirectIT {
      * BR-01: navigating to /welcome when a Household already exists redirects to /plan.
      */
     @Test
-    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    @DisplayName("Opening onboarding with a household already set up lands on the plan")
     void existingHouseholdRedirectsToPlan(UnifiedPage page) {
-        Page playwright = page.unwrap(Page.class);
         page.navigate(OnboardingView.class);
-        // TODO unified: Dramafinder Escape Hatch: assertThat(playwright).hasURL(Pattern.compile(".*/plan.*"))
-        assertThat(playwright).hasURL(Pattern.compile(".*/plan.*"));
+
+        assertThat(page).isAt(PlanView.class);
     }
 }
