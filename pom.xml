@@ -195,19 +195,61 @@
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-failsafe-plugin</artifactId>
+                        <!--
+                            Unified UI Tests: the same *IT classes run twice, first on Browserless
+                            (in-JVM, no browser), then on Playwright (headless Chromium). Each
+                            execution gets its own Failsafe reports, summary file and Unified
+                            evidence dir, or the second silently overwrites the first and `verify`
+                            only checks the last tool. The Playwright run compares itself with the
+                            Browserless run ("Compared with Browserless" in its summary.md).
+                            See the unified-test guide, "CI setup / Both Testing Tools in one build".
+                        -->
                         <executions>
+                            <!-- spring-boot-starter-parent's own execution; without the skip the ITs run a third time. -->
                             <execution>
+                                <id>default</id>
+                                <configuration>
+                                    <skip>true</skip>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>it-browserless</id>
                                 <goals>
                                     <goal>integration-test</goal>
                                     <goal>verify</goal>
                                 </goals>
+                                <configuration>
+                                    <reportsDirectory>${project.build.directory}/failsafe-reports/browserless</reportsDirectory>
+                                    <summaryFile>${project.build.directory}/failsafe-reports/browserless/failsafe-summary.xml</summaryFile>
+                                    <systemPropertyVariables>
+                                        <vaadin.testing.tool>browserless</vaadin.testing.tool>
+                                        <vaadin.testing.evidence-dir>${project.build.directory}/failsafe-reports/browserless/unified-evidence</vaadin.testing.evidence-dir>
+                                    </systemPropertyVariables>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>it-playwright</id>
+                                <goals>
+                                    <goal>integration-test</goal>
+                                    <goal>verify</goal>
+                                </goals>
+                                <configuration>
+                                    <reportsDirectory>${project.build.directory}/failsafe-reports/playwright</reportsDirectory>
+                                    <summaryFile>${project.build.directory}/failsafe-reports/playwright/failsafe-summary.xml</summaryFile>
+                                    <systemPropertyVariables>
+                                        <vaadin.testing.tool>playwright</vaadin.testing.tool>
+                                        <vaadin.testing.playwright.headless>${headless}</vaadin.testing.playwright.headless>
+                                        <vaadin.testing.evidence-dir>${project.build.directory}/failsafe-reports/playwright/unified-evidence</vaadin.testing.evidence-dir>
+                                        <vaadin.testing.user-steps.compare-dir>${project.build.directory}/failsafe-reports/browserless/unified-evidence</vaadin.testing.user-steps.compare-dir>
+                                    </systemPropertyVariables>
+                                </configuration>
                             </execution>
                         </executions>
                         <configuration>
                             <!--
                                 Failsafe's default include is **/*IT.java, which also matches
                                 **/*AIIT.java (the suffix `IT.java` is a substring of `AIIT.java`).
-                                Exclude AIIT explicitly so -Pit runs Playwright ITs only — AIIT
+                                Exclude AIIT explicitly so -Pit runs the UI ITs only — AIIT
                                 stays gated behind -Pai-it where the live LLM endpoint is wired.
                             -->
                             <excludes>
@@ -215,9 +257,6 @@
                             </excludes>
                             <!-- Manual-example release-gate ITs are opt-in (-Pmanual-verify); never in -Pit. -->
                             <excludedGroups>manual-example</excludedGroups>
-                            <systemPropertyVariables>
-                                <headless>${headless}</headless>
-                            </systemPropertyVariables>
                         </configuration>
                     </plugin>
                 </plugins>
@@ -247,12 +286,54 @@
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-failsafe-plugin</artifactId>
+                        <!--
+                            Unified UI Tests: the same *IT classes run twice, first on Browserless
+                            (in-JVM, no browser), then on Playwright (headless Chromium). Each
+                            execution gets its own Failsafe reports, summary file and Unified
+                            evidence dir, or the second silently overwrites the first and `verify`
+                            only checks the last tool. The Playwright run compares itself with the
+                            Browserless run ("Compared with Browserless" in its summary.md).
+                            See the unified-test guide, "CI setup / Both Testing Tools in one build".
+                        -->
                         <executions>
+                            <!-- spring-boot-starter-parent's own execution; without the skip the ITs run a third time. -->
                             <execution>
+                                <id>default</id>
+                                <configuration>
+                                    <skip>true</skip>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>it-browserless</id>
                                 <goals>
                                     <goal>integration-test</goal>
                                     <goal>verify</goal>
                                 </goals>
+                                <configuration>
+                                    <reportsDirectory>${project.build.directory}/failsafe-reports/browserless</reportsDirectory>
+                                    <summaryFile>${project.build.directory}/failsafe-reports/browserless/failsafe-summary.xml</summaryFile>
+                                    <systemPropertyVariables>
+                                        <vaadin.testing.tool>browserless</vaadin.testing.tool>
+                                        <vaadin.testing.evidence-dir>${project.build.directory}/failsafe-reports/browserless/unified-evidence</vaadin.testing.evidence-dir>
+                                    </systemPropertyVariables>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>it-playwright</id>
+                                <goals>
+                                    <goal>integration-test</goal>
+                                    <goal>verify</goal>
+                                </goals>
+                                <configuration>
+                                    <reportsDirectory>${project.build.directory}/failsafe-reports/playwright</reportsDirectory>
+                                    <summaryFile>${project.build.directory}/failsafe-reports/playwright/failsafe-summary.xml</summaryFile>
+                                    <systemPropertyVariables>
+                                        <vaadin.testing.tool>playwright</vaadin.testing.tool>
+                                        <vaadin.testing.playwright.headless>${headless}</vaadin.testing.playwright.headless>
+                                        <vaadin.testing.evidence-dir>${project.build.directory}/failsafe-reports/playwright/unified-evidence</vaadin.testing.evidence-dir>
+                                        <vaadin.testing.user-steps.compare-dir>${project.build.directory}/failsafe-reports/browserless/unified-evidence</vaadin.testing.user-steps.compare-dir>
+                                    </systemPropertyVariables>
+                                </configuration>
                             </execution>
                         </executions>
                         <configuration>
@@ -295,12 +376,54 @@
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-failsafe-plugin</artifactId>
+                        <!--
+                            Unified UI Tests: the same *IT classes run twice, first on Browserless
+                            (in-JVM, no browser), then on Playwright (headless Chromium). Each
+                            execution gets its own Failsafe reports, summary file and Unified
+                            evidence dir, or the second silently overwrites the first and `verify`
+                            only checks the last tool. The Playwright run compares itself with the
+                            Browserless run ("Compared with Browserless" in its summary.md).
+                            See the unified-test guide, "CI setup / Both Testing Tools in one build".
+                        -->
                         <executions>
+                            <!-- spring-boot-starter-parent's own execution; without the skip the ITs run a third time. -->
                             <execution>
+                                <id>default</id>
+                                <configuration>
+                                    <skip>true</skip>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>it-browserless</id>
                                 <goals>
                                     <goal>integration-test</goal>
                                     <goal>verify</goal>
                                 </goals>
+                                <configuration>
+                                    <reportsDirectory>${project.build.directory}/failsafe-reports/browserless</reportsDirectory>
+                                    <summaryFile>${project.build.directory}/failsafe-reports/browserless/failsafe-summary.xml</summaryFile>
+                                    <systemPropertyVariables>
+                                        <vaadin.testing.tool>browserless</vaadin.testing.tool>
+                                        <vaadin.testing.evidence-dir>${project.build.directory}/failsafe-reports/browserless/unified-evidence</vaadin.testing.evidence-dir>
+                                    </systemPropertyVariables>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>it-playwright</id>
+                                <goals>
+                                    <goal>integration-test</goal>
+                                    <goal>verify</goal>
+                                </goals>
+                                <configuration>
+                                    <reportsDirectory>${project.build.directory}/failsafe-reports/playwright</reportsDirectory>
+                                    <summaryFile>${project.build.directory}/failsafe-reports/playwright/failsafe-summary.xml</summaryFile>
+                                    <systemPropertyVariables>
+                                        <vaadin.testing.tool>playwright</vaadin.testing.tool>
+                                        <vaadin.testing.playwright.headless>${headless}</vaadin.testing.playwright.headless>
+                                        <vaadin.testing.evidence-dir>${project.build.directory}/failsafe-reports/playwright/unified-evidence</vaadin.testing.evidence-dir>
+                                        <vaadin.testing.user-steps.compare-dir>${project.build.directory}/failsafe-reports/browserless/unified-evidence</vaadin.testing.user-steps.compare-dir>
+                                    </systemPropertyVariables>
+                                </configuration>
                             </execution>
                         </executions>
                         <configuration>

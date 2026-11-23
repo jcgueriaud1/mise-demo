@@ -47,6 +47,15 @@ With the recipe's build changes and no extra configuration, `./mvnw -Pit verify`
 The recipe now turns `getView()` returning `"/plan"` into `page.navigate(PlanView.class)` (F25). The same class's `page.navigate(getUrl() + "/plan")` becomes `page.navigate("plan")`, a path, so it isn't checked at compile time and its User Step reads `open “plan”`. In Mise, 9 navigations in `PlanViewIT` (and some in other classes) re-open the view mid-test to reload it.
 **Suggestion:** apply the same "exactly one `@Route`" rule to the `getUrl()` conversion, including `+ "?week=" + x` → `navigate(View.class, QueryParameters.of(..))`.
 
+### G8: The Findable View is written outside the test's evidence directory, and the failure doesn't name it. Verified · minor
+
+The release notes say a failed test writes `<test>.view.txt` and that the failure's evidence line names it. Here it was written as `unified-evidence/com.example.mise.it.OnboardingViewIT.messagesPersistedWithOnboardingViewContext.view.txt`, at the root. The test's own directory, `unified-evidence/OnboardingViewIT/messagesPersistedWithOnboardingViewContext/`, holds only `user-steps.txt` / `.json`. The `UnifiedAssertionError`'s `Evidence` line names that directory, not the view file. On Browserless no screenshot is written, so a reader who opens the named directory doesn't find the view.
+**Suggestion:** write the view into the test's evidence directory, or name it in `Evidence` / `user-steps.json`'s `failure`.
+
+### G9: Server-log lines under the User Step found an app bug in one read. Verified · positive
+
+On the first Browserless run, `OnboardingViewIT` failed with `Expected exactly one message input, found none`. The cause was printed under User Step 1 in `user-steps.txt`: `⚠ server ERROR … CancellableLLMProvider is already in use by another AIOrchestrator`. It came from a view that rebuilds its orchestrator when `beforeEnter` fires again on the same instance, which Browserless does on a same-route `navigate` and a browser hides behind a full page load. Without the log line, "found none" would have meant a debugging session. This is the same class of finding as alpha3's F20, which took longer to diagnose.
+
 ## alpha3 findings re-checked
 
 | alpha3 | Status in alpha4 | Evidence |
@@ -62,5 +71,7 @@ The recipe now turns `getView()` returning `"/plan"` into `page.navigate(PlanVie
 | F13 | **Fixed**: no `spring-security-core` needed | step 4 |
 | F14 | **Fixed**: `browserless-test-spring` version removed | step 4 |
 | F15 | **Fixed**: pointer in `CLAUDE.md` | step 4 |
+| F18 | **Fixed** (documented, copy-paste snippet with compare-dir) | step 6 |
 | F19 | **Fixed**: comments stay above the statement | step 4 |
+| F20 | Still true (positive), and alpha4's server-log lines make it fast to diagnose | G9 |
 | F25 | **Fixed** for `getView()`; `getUrl()` paths stay strings | G7 |

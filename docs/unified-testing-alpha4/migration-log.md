@@ -14,7 +14,7 @@ Issues found along the way: [`findings.md`](findings.md)
 | 3 | Dry run `FindTestClassesToMigrate`, unblock, re-run | **Done**: 3/13 → 13/13 "migrates" in 2 dry runs, 1 hand edit |
 | 4 | Run the Migration Recipes | **Done**: 13/13 converted in one run, 228 markers, PW 74 ✓ with no hand edits |
 | 5 | Unblock skipped classes (if any), re-run | **Folded into step 3** (the guide's dry-run loop) |
-| 6 | Configure the test layers (Playwright + Browserless) | |
+| 6 | Configure the test layers (Playwright + Browserless) | **Done**: BL 10 ✓ + 64 skipped, PW 74 ✓, 1 app bug fixed |
 | 7 | Resolve the Migration Markers, class by class | |
 | 8 | `UnifiedStyleTest` (ArchUnit style rules) | |
 | 9 | Try alpha4's new tooling on the migrated suite | |
@@ -214,3 +214,49 @@ The raw locator conversion did fire: **22 `withId(..)` and 17 `withTestId(..)`**
 - The surefire and failsafe runs write to the same `target/surefire-reports/unified-evidence/`. The summary says "74 passed, 1 skipped", mixing the two phases (G6).
 
 **How it went (about 15 minutes, mostly reading the diff):** the biggest single improvement over alpha3. alpha3 went 2/13 → (hand prep, 2 iterations) → 12/12 + 285 markers. alpha4 went 13/13 in one run, with the right annotations and fixtures, green on Playwright before any marker was touched. Fewer markers remain, and they are more focused: almost all are real Escape Hatch checks (CSS, scroll, DOM structure) or assertion kinds the recipe doesn't map yet.
+
+---
+
+## Step 6: Configure the test layers (2026-11-23)
+
+**F18 is documented now.** The alpha4 guide's *CI setup → Both Testing Tools in one build* has the full Failsafe snippet. It covers:
+- skipping the `default` execution from `spring-boot-starter-parent`
+- per-execution `reportsDirectory`, `summaryFile` and `vaadin.testing.evidence-dir`
+- `compare-dir` on the second execution
+
+alpha3's step 6 worked all of that out by hand, including the "trap" of the parent POM's `default` execution.
+
+**Changes** (`pom.xml`, profile `it`), from the guide's snippet:
+- `default`: skipped. The old unnamed execution in the profile *was* `default`, so it's replaced.
+- `it-browserless`: `vaadin.testing.tool=browserless`, reports + evidence under `target/failsafe-reports/browserless/`.
+- `it-playwright`: `vaadin.testing.tool=playwright`, `vaadin.testing.playwright.headless=${headless}` (it replaces DramaFinder's `headless` system property), reports + evidence under `target/failsafe-reports/playwright/`, `compare-dir` → the Browserless evidence.
+- The `**/*AIIT.java` exclude and `excludedGroups=manual-example` stay at plugin level.
+- Surefire is left alone: its default tool is Browserless, and `-Dvaadin.testing.tool` no longer needs passing on the command line. This also fixes G6 for `-Pit`, because the failsafe runs no longer write into `surefire-reports/unified-evidence`.
+- CI (`.github/workflows/ci.yml`) runs surefire only and uploads all of `target/surefire-reports/`, so the evidence is already included. No change.
+
+**First run:** Browserless **9 ✓ / 1 ✘ / 64 skipped**. The 64 are the tests the recipe marked `@RequiresTestingTool(PLAYWRIGHT)`; they're unpinned in step 7. Playwright **74 ✓**.
+
+**The Browserless failure was an app bug, and alpha4's evidence pointed straight at it.** `summary.md` gave the failed step and the error (`Expected exactly one message input, found none`). The test's `user-steps.txt` showed the cause under User Step 1, through the new server-log lines:
+
+```text
+✘ OnboardingViewIT › messagesPersistedWithOnboardingViewContext   browserless · 10.2 s
+   1  open Onboarding
+      ⚠ server ERROR InternalServerError: There was an exception while trying to navigate to 'welcome' (IllegalStateException: CancellableLLMProvider is already in use by another AIOrchestrator. ...)
+   2  send “Two adults, no allergies, €80/week” in message input   ✘
+```
+
+Browserless keeps one UI across `page.navigate(..)`. Re-entering `/welcome` reuses the `OnboardingView` instance and fires `beforeEnter` again, and `buildUI()` then builds a second `AIOrchestrator` on the view's one (prototype-injected) provider. A browser hides this because every navigation is a full page load, but a user re-entering the route in the same UI would hit it. **Fix:** `OnboardingView.beforeEnter` builds the UI only once (`if (orchestrator == null)`). This is a 4-line app change.
+
+The new Findable View (`….view.txt`) was written too: `Findable view of “/welcome” on browserless: no component a Unified UI Test can find`. That's correct, since navigation threw, but the file sits at the evidence root, not in the test's directory, and the failure's `Evidence` line doesn't name it (G8).
+
+**Final results** (`./mvnw -Pit verify`, 56 s):
+
+| Phase | Result |
+|---|---|
+| surefire | **193 ✓** |
+| it-browserless | **10 ✓**, 64 skipped |
+| it-playwright | **74 ✓** |
+
+The Playwright `summary.md` now reads: *"Compared with Browserless: 10 scenarios ran on both Testing Tools: same result and same User Steps on each. 64 ran on Playwright only. Both runs are of commit `a61afe0`, with the same uncommitted changes."*
+
+**How it went (about 20 minutes):** the build config was a copy-paste from the guide; alpha3 had to discover it. The time went into the app bug, and that took one read of `user-steps.txt`. alpha3 found its Browserless-only app bug (F20) later and by debugging.
