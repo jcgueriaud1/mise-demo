@@ -12,12 +12,23 @@ import com.example.mise.domain.plan.MealRepository;
 import com.example.mise.domain.plan.PinnedMealException;
 import com.example.mise.domain.plan.PlanRepository;
 import com.example.mise.domain.plan.PlanService;
+import com.example.mise.it.support.TestAiConfig;
+import com.example.mise.it.support.TestChatModel;
+import com.example.mise.ui.plan.PlanView;
 
+import com.microsoft.playwright.Page;
+import com.vaadin.testing.unified.RequiresTestingTool;
+import com.vaadin.testing.unified.TestingTool;
+import com.vaadin.testing.unified.UnifiedPage;
+import com.vaadin.testing.unified.component.UnifiedContainer;
+import com.vaadin.testing.unified.spring.UnifiedSpringBootTest;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
+import org.springframework.test.context.ActiveProfiles;
 import org.vaadin.addons.dramafinder.element.MessageInputElement;
 import org.vaadin.addons.dramafinder.element.MessageListElement;
 
@@ -43,7 +54,19 @@ import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertTha
  * <p>Cleanup in {@code @AfterEach} deletes rows in FK-safe order:
  * meal_edit → conversation_message → meal → plan → household.
  */
-class PlanViewIT extends MisePlaywrightIT {
+@UnifiedSpringBootTest
+@ActiveProfiles("it")
+@Import(TestAiConfig.class)
+class PlanViewIT {
+
+    @Autowired
+    protected TestChatModel chatModel;
+
+    @BeforeEach
+    void resetChatModelBetweenTests() {
+        chatModel.reset();
+    }
+
 
     @Autowired
     private HouseholdService householdService;
@@ -69,17 +92,11 @@ class PlanViewIT extends MisePlaywrightIT {
     @Autowired
     private ConversationMessageRepository conversationMessageRepository;
 
-    @Override
-    public String getView() {
-        return "/plan";
-    }
-
     /**
      * Override to seed state BEFORE the base class navigates to /plan.
      * The base @BeforeEach on setupTest() is hidden by this override in JUnit 5;
      * super.setupTest() must be called explicitly to perform the browser navigation.
      */
-    @Override
     @BeforeEach
     public void setupTest() throws Exception {
         // Seed household
@@ -95,9 +112,6 @@ class PlanViewIT extends MisePlaywrightIT {
         // the YAML catalog and saves Plan + 7 Meal rows with status=PLANNED.
         var household = householdService.findHousehold().orElseThrow();
         planService.generateActivePlan(household, recipeCatalog);
-
-        // Navigate AFTER seeding so PlanView.beforeEnter() finds the household and plan.
-        super.setupTest();
     }
 
     @AfterEach
@@ -120,8 +134,12 @@ class PlanViewIT extends MisePlaywrightIT {
      * UC-002 AC: loading /plan renders the page with the correct title.
      */
     @Test
-    void hasPageTitle() {
-        assertThat(page).hasTitle("Mise — Plan");
+    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    void hasPageTitle(UnifiedPage page) {
+        Page playwright = page.unwrap(Page.class);
+        page.navigate(PlanView.class);
+        // TODO unified: Dramafinder Escape Hatch: assertThat(playwright).hasTitle("Mise — Plan")
+        assertThat(playwright).hasTitle("Mise — Plan");
     }
 
     /**
@@ -129,12 +147,17 @@ class PlanViewIT extends MisePlaywrightIT {
      * BR-03: stats are computed from the currently shown meals.
      */
     @Test
-    void kpiStripRenders() {
-        assertThat(page.getByTestId("kpi-strip")).isVisible();
-        assertThat(page.getByTestId("kpi-card-weekly-cost")).isVisible();
-        assertThat(page.getByTestId("kpi-card-avg-meal")).isVisible();
-        assertThat(page.getByTestId("kpi-card-total-prep")).isVisible();
-        assertThat(page.getByTestId("kpi-card-avg-kcal")).isVisible();
+    void kpiStripRenders(UnifiedPage page) {
+        page.navigate(PlanView.class);
+        com.vaadin.testing.unified.assertion.UnifiedAssertions.assertThat(page.find(UnifiedContainer.class).withTestId("kpi-strip")).isVisible();
+        // TODO unified: was getByTestId("kpi-card-weekly-cost"): no view in the sources sets this test id; UnifiedContainer finds any component, use the component's own Wrapper if it has one
+        com.vaadin.testing.unified.assertion.UnifiedAssertions.assertThat(page.find(UnifiedContainer.class).withTestId("kpi-card-weekly-cost")).isVisible();
+        // TODO unified: was getByTestId("kpi-card-avg-meal"): no view in the sources sets this test id; UnifiedContainer finds any component, use the component's own Wrapper if it has one
+        com.vaadin.testing.unified.assertion.UnifiedAssertions.assertThat(page.find(UnifiedContainer.class).withTestId("kpi-card-avg-meal")).isVisible();
+        // TODO unified: was getByTestId("kpi-card-total-prep"): no view in the sources sets this test id; UnifiedContainer finds any component, use the component's own Wrapper if it has one
+        com.vaadin.testing.unified.assertion.UnifiedAssertions.assertThat(page.find(UnifiedContainer.class).withTestId("kpi-card-total-prep")).isVisible();
+        // TODO unified: was getByTestId("kpi-card-avg-kcal"): no view in the sources sets this test id; UnifiedContainer finds any component, use the component's own Wrapper if it has one
+        com.vaadin.testing.unified.assertion.UnifiedAssertions.assertThat(page.find(UnifiedContainer.class).withTestId("kpi-card-avg-kcal")).isVisible();
     }
 
     /**
@@ -142,17 +165,25 @@ class PlanViewIT extends MisePlaywrightIT {
      * BR-02: grid always has 7 rows; missing slots show empty placeholders.
      */
     @Test
-    void mealGridHasSevenRows() {
-        assertThat(page.getByTestId("meal-row")).hasCount(7);
+    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    void mealGridHasSevenRows(UnifiedPage page) {
+        Page playwright = page.unwrap(Page.class);
+        page.navigate(PlanView.class);
+        // TODO unified: Dramafinder Escape Hatch: assertThat(playwright.getByTestId("meal-row")).hasCount(7)
+        assertThat(playwright.getByTestId("meal-row")).hasCount(7);
     }
 
     /**
      * UC-002 AC: the cost-by-category panel is visible and shows its title.
      */
     @Test
-    void costByCategoryPanelRenders() {
-        assertThat(page.getByTestId("cost-by-category-panel")).isVisible();
-        assertThat(page.getByTestId("cost-by-category-panel").getByText("COST BY CATEGORY"))
+    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    void costByCategoryPanelRenders(UnifiedPage page) {
+        Page playwright = page.unwrap(Page.class);
+        page.navigate(PlanView.class);
+        com.vaadin.testing.unified.assertion.UnifiedAssertions.assertThat(page.find(UnifiedContainer.class).withTestId("cost-by-category-panel")).isVisible();
+        // TODO unified: Dramafinder Escape Hatch: assertThat(playwright.getByTestId("cost-by-category-panel").getByText("COST BY CATEGORY")).isVisible()
+        assertThat(playwright.getByTestId("cost-by-category-panel").getByText("COST BY CATEGORY"))
                 .isVisible();
     }
 
@@ -166,24 +197,34 @@ class PlanViewIT extends MisePlaywrightIT {
      * {@code vaadin-message-list} *inside* the provided locator (one level too deep).
      */
     @Test
-    void chatRoundTripWorksOnSharedDock() {
+    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    void chatRoundTripWorksOnSharedDock(UnifiedPage page) {
+        Page playwright = page.unwrap(Page.class);
+        page.navigate(PlanView.class);
         chatModel.queueReply("Friday is creamy salmon pasta.");
 
         // Scope the MessageInput to the chat dock — chat-dock contains vaadin-message-input.
-        var chatDockLocator = page.getByTestId("chat-dock");
+        // TODO unified: Dramafinder Escape Hatch: playwright.getByTestId("chat-dock")
+        var chatDockLocator = playwright.getByTestId("chat-dock");
+        // TODO unified: Dramafinder Escape Hatch: MessageInputElement.get(chatDockLocator)
         MessageInputElement input = MessageInputElement.get(chatDockLocator);
+        // TODO unified: Dramafinder Escape Hatch: input.typeAndSubmit("What's on Friday?")
         input.typeAndSubmit("What's on Friday?");
 
         // Focus the message input to trigger :focus-within on the dock, which CSS
         // expands the message-history region from max-height:0 to visible.
+        // TODO unified: Dramafinder Escape Hatch: input.focus()
         input.focus();
 
         // Wrap the testid locator directly — the testid IS the vaadin-message-list.
-        MessageListElement messages = new MessageListElement(page.getByTestId("chat-message-list"));
+        // TODO unified: Dramafinder Escape Hatch: new MessageListElement(playwright.getByTestId("chat-message-list"))
+        MessageListElement messages = new MessageListElement(playwright.getByTestId("chat-message-list"));
+        // TODO unified: Dramafinder Escape Hatch: messages.assertMessageCount(2)
         messages.assertMessageCount(2);
 
         // The last-AI-message preview span must be updated with the queued reply.
-        assertThat(page.getByTestId("chat-last-ai-message"))
+        // TODO unified: Dramafinder Escape Hatch: assertThat(playwright.getByTestId("chat-last-ai-message")).containsText("Friday is creamy salmon pasta.")
+        assertThat(playwright.getByTestId("chat-last-ai-message"))
                 .containsText("Friday is creamy salmon pasta.");
     }
 
@@ -192,17 +233,26 @@ class PlanViewIT extends MisePlaywrightIT {
      * ViewContext.PLAN so the conversation is correctly attributed to the Plan view.
      */
     @Test
-    void conversationPersistedWithPlanViewContext() {
+    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    void conversationPersistedWithPlanViewContext(UnifiedPage page) {
+        Page playwright = page.unwrap(Page.class);
+        page.navigate(PlanView.class);
         chatModel.queueReply("Friday is creamy salmon pasta.");
 
-        var chatDockLocator = page.getByTestId("chat-dock");
+        // TODO unified: Dramafinder Escape Hatch: playwright.getByTestId("chat-dock")
+        var chatDockLocator = playwright.getByTestId("chat-dock");
+        // TODO unified: Dramafinder Escape Hatch: MessageInputElement.get(chatDockLocator)
         MessageInputElement input = MessageInputElement.get(chatDockLocator);
+        // TODO unified: Dramafinder Escape Hatch: input.typeAndSubmit("What's on Friday?")
         input.typeAndSubmit("What's on Friday?");
 
         // Focus the input to expand the dock and wait for the assistant turn to land.
+        // TODO unified: Dramafinder Escape Hatch: input.focus()
         input.focus();
         // Wrap testid locator directly (testid IS the vaadin-message-list element).
-        MessageListElement messages = new MessageListElement(page.getByTestId("chat-message-list"));
+        // TODO unified: Dramafinder Escape Hatch: new MessageListElement(playwright.getByTestId("chat-message-list"))
+        MessageListElement messages = new MessageListElement(playwright.getByTestId("chat-message-list"));
+        // TODO unified: Dramafinder Escape Hatch: messages.assertMessageCount(2)
         messages.assertMessageCount(2);
 
         // Both the user and assistant messages should be stamped PLAN.
@@ -218,8 +268,12 @@ class PlanViewIT extends MisePlaywrightIT {
      * UC-003 UI requirement: a pin icon button is visible on every meal row (Mon–Sun).
      */
     @Test
-    void pinButtonVisibleOnEveryRow() {
-        assertThat(page.getByTestId("meal-action-pin")).hasCount(7);
+    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    void pinButtonVisibleOnEveryRow(UnifiedPage page) {
+        Page playwright = page.unwrap(Page.class);
+        page.navigate(PlanView.class);
+        // TODO unified: Dramafinder Escape Hatch: assertThat(playwright.getByTestId("meal-action-pin")).hasCount(7)
+        assertThat(playwright.getByTestId("meal-action-pin")).hasCount(7);
     }
 
     /**
@@ -228,7 +282,10 @@ class PlanViewIT extends MisePlaywrightIT {
      * view is reloaded.
      */
     @Test
-    void editedPillRendersAfterAiSwap() {
+    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    void editedPillRendersAfterAiSwap(UnifiedPage page) {
+        Page playwright = page.unwrap(Page.class);
+        page.navigate(PlanView.class);
         var household = householdService.findHousehold().orElseThrow();
         var plan = planService.findActivePlan(household.getId()).orElseThrow();
 
@@ -252,10 +309,11 @@ class PlanViewIT extends MisePlaywrightIT {
                 "vegetarian alternative for kid-friendly request");
 
         // Reload /plan so PlanView.beforeEnter() re-fetches and re-renders with fresh meal data
-        page.navigate(getUrl() + "/plan");
+        page.navigate("plan");
 
         // The edited pill must appear on Thursday's row within the 60-second window
-        assertThat(page.locator("[data-meal-date='" + thursday + "'] [data-testid='meal-status-edited-pill']"))
+        // TODO unified: Dramafinder Escape Hatch: assertThat(playwright.locator("[data-meal-date='" + thursday + "'] [data-testid='meal-status-edited-pill']")).isVisible()
+        assertThat(playwright.locator("[data-meal-date='" + thursday + "'] [data-testid='meal-status-edited-pill']"))
                 .isVisible();
     }
 
@@ -264,7 +322,8 @@ class PlanViewIT extends MisePlaywrightIT {
      * com.example.mise.domain.plan.MealEdit} row with the correct audit fields.
      */
     @Test
-    void mealEditRowPersistedAfterAiSwap() {
+    void mealEditRowPersistedAfterAiSwap(UnifiedPage page) {
+        page.navigate(PlanView.class);
         var household = householdService.findHousehold().orElseThrow();
         var plan = planService.findActivePlan(household.getId()).orElseThrow();
 
@@ -298,7 +357,10 @@ class PlanViewIT extends MisePlaywrightIT {
      * after a reload the row still shows the original recipe.
      */
     @Test
-    void pinnedMealRejectsSwap() {
+    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    void pinnedMealRejectsSwap(UnifiedPage page) {
+        Page playwright = page.unwrap(Page.class);
+        page.navigate(PlanView.class);
         var household = householdService.findHousehold().orElseThrow();
         var plan = planService.findActivePlan(household.getId()).orElseThrow();
 
@@ -323,8 +385,9 @@ class PlanViewIT extends MisePlaywrightIT {
                 .isInstanceOf(PinnedMealException.class);
 
         // Reload the view and confirm Monday's row is still present (original recipe untouched)
-        page.navigate(getUrl() + "/plan");
-        assertThat(page.locator("[data-meal-date='" + monday + "']")).isVisible();
+        page.navigate("plan");
+        // TODO unified: Dramafinder Escape Hatch: assertThat(playwright.locator("[data-meal-date='" + monday + "']")).isVisible()
+        assertThat(playwright.locator("[data-meal-date='" + monday + "']")).isVisible();
     }
 
     /**
@@ -334,19 +397,29 @@ class PlanViewIT extends MisePlaywrightIT {
      * asserts the chat UI surface.
      */
     @Test
-    void chatRoundTripOnPlanViewWithStubbedSwap() {
+    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    void chatRoundTripOnPlanViewWithStubbedSwap(UnifiedPage page) {
+        Page playwright = page.unwrap(Page.class);
+        page.navigate(PlanView.class);
         String reply = "Swapped Thursday’s meal for a vegetarian option — kid-friendly pea risotto, under 30 min.";
         chatModel.queueReply(reply);
 
-        var chatDockLocator = page.getByTestId("chat-dock");
+        // TODO unified: Dramafinder Escape Hatch: playwright.getByTestId("chat-dock")
+        var chatDockLocator = playwright.getByTestId("chat-dock");
+        // TODO unified: Dramafinder Escape Hatch: MessageInputElement.get(chatDockLocator)
         MessageInputElement input = MessageInputElement.get(chatDockLocator);
+        // TODO unified: Dramafinder Escape Hatch: input.typeAndSubmit("Make Thursday vegetarian, kid is having a friend over.")
         input.typeAndSubmit("Make Thursday vegetarian, kid is having a friend over.");
 
+        // TODO unified: Dramafinder Escape Hatch: input.focus()
         input.focus();
-        MessageListElement messages = new MessageListElement(page.getByTestId("chat-message-list"));
+        // TODO unified: Dramafinder Escape Hatch: new MessageListElement(playwright.getByTestId("chat-message-list"))
+        MessageListElement messages = new MessageListElement(playwright.getByTestId("chat-message-list"));
+        // TODO unified: Dramafinder Escape Hatch: messages.assertMessageCount(2)
         messages.assertMessageCount(2);
 
-        assertThat(page.getByTestId("chat-last-ai-message")).containsText(reply);
+        // TODO unified: Dramafinder Escape Hatch: assertThat(playwright.getByTestId("chat-last-ai-message")).containsText(reply)
+        assertThat(playwright.getByTestId("chat-last-ai-message")).containsText(reply);
     }
 
     /**
@@ -354,10 +427,14 @@ class PlanViewIT extends MisePlaywrightIT {
      * matching its ISO date, allowing per-day pin assertions in later UCs.
      */
     @Test
-    void pinButtonHasDataPinDateAttribute() {
+    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    void pinButtonHasDataPinDateAttribute(UnifiedPage page) {
+        Page playwright = page.unwrap(Page.class);
+        page.navigate(PlanView.class);
         // At least one [data-pin-date] element must be visible — proves the per-day
         // locator pattern works for later UC assertions.
-        assertThat(page.locator("[data-pin-date]").first()).isVisible();
+        // TODO unified: Dramafinder Escape Hatch: assertThat(playwright.locator("[data-pin-date]").first()).isVisible()
+        assertThat(playwright.locator("[data-pin-date]").first()).isVisible();
     }
 
     // ─── UC-004 ──────────────────────────────────────────────────────────────
@@ -391,14 +468,18 @@ class PlanViewIT extends MisePlaywrightIT {
      * per-day undo button is visible.
      */
     @Test
-    void undoButtonVisibleOnRowWithEditHistory() {
+    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    void undoButtonVisibleOnRowWithEditHistory(UnifiedPage page) {
+        Page playwright = page.unwrap(Page.class);
+        page.navigate(PlanView.class);
         Meal wednesday = findMealForDay(DayOfWeek.WEDNESDAY);
         String altRef = findAlternativeRecipe(wednesday.getRecipeRef());
         planService.swapMeal(wednesday.getId(), altRef, "vegetarian swap for IT");
 
-        page.navigate(getUrl() + "/plan");
+        page.navigate("plan");
 
-        assertThat(page.getByTestId("meal-action-undo").first()).isVisible();
+        // TODO unified: Dramafinder Escape Hatch: assertThat(playwright.getByTestId("meal-action-undo").first()).isVisible()
+        assertThat(playwright.getByTestId("meal-action-undo").first()).isVisible();
     }
 
     /**
@@ -408,17 +489,21 @@ class PlanViewIT extends MisePlaywrightIT {
      * have an undo button.
      */
     @Test
-    void undoButtonNotVisibleOnRowWithNoHistory() {
+    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    void undoButtonNotVisibleOnRowWithNoHistory(UnifiedPage page) {
+        Page playwright = page.unwrap(Page.class);
+        page.navigate(PlanView.class);
         // Swap Wednesday so that "at least one undo button" exists (confirms the feature
         // is active) but Monday has no history — its undo button must be absent.
         Meal wednesday = findMealForDay(DayOfWeek.WEDNESDAY);
         String altRef = findAlternativeRecipe(wednesday.getRecipeRef());
         planService.swapMeal(wednesday.getId(), altRef, "vegetarian swap for IT");
 
-        page.navigate(getUrl() + "/plan");
+        page.navigate("plan");
 
         // Monday has no edit history — its undo button must not be in the DOM / visible.
-        assertThat(page.locator("#mise-meal-undo-monday")).not().isVisible();
+        // TODO unified: Dramafinder Escape Hatch: assertThat(playwright.locator("#mise-meal-undo-monday")).not().isVisible()
+        assertThat(playwright.locator("#mise-meal-undo-monday")).not().isVisible();
     }
 
     /**
@@ -427,7 +512,10 @@ class PlanViewIT extends MisePlaywrightIT {
      * (c) the post-undo MealEdit count for that meal = pre-undo count + 1.
      */
     @Test
-    void clickingRowUndoRestoresPreviousRecipeAndWritesUndoAuditRow() {
+    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    void clickingRowUndoRestoresPreviousRecipeAndWritesUndoAuditRow(UnifiedPage page) {
+        Page playwright = page.unwrap(Page.class);
+        page.navigate(PlanView.class);
         Meal thursday = findMealForDay(DayOfWeek.THURSDAY);
         String originalRef = thursday.getRecipeRef();
         String altRef = findAlternativeRecipe(originalRef);
@@ -436,13 +524,15 @@ class PlanViewIT extends MisePlaywrightIT {
 
         int preUndoCount = mealEditRepository.findByMealIdOrderByChangedAtDesc(thursday.getId()).size();
 
-        page.navigate(getUrl() + "/plan");
+        page.navigate("plan");
 
         // Click the per-day undo button for Thursday
-        page.locator("#mise-meal-undo-thursday").click();
+        // TODO unified: was locator("#mise-meal-undo-thursday"): no view in the sources sets this id; UnifiedContainer finds any component, use the component's own Wrapper if it has one
+        page.find(UnifiedContainer.class).withId("mise-meal-undo-thursday").click();
 
         // Wait for the Vaadin notification to confirm undo was applied
-        assertThat(page.getByText("Undo applied")).isVisible();
+        // TODO unified: Dramafinder Escape Hatch: assertThat(playwright.getByText("Undo applied")).isVisible()
+        assertThat(playwright.getByText("Undo applied")).isVisible();
 
         // Assert DB state: recipeRef restored
         Meal reloaded = mealRepository.findById(thursday.getId()).orElseThrow();
@@ -460,29 +550,39 @@ class PlanViewIT extends MisePlaywrightIT {
      * and the stubbed assistant reply lands as a second message.
      */
     @Test
-    void whyButtonClickSubmitsChatMessageAndReceivesReply() {
+    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    void whyButtonClickSubmitsChatMessageAndReceivesReply(UnifiedPage page) {
+        Page playwright = page.unwrap(Page.class);
+        page.navigate(PlanView.class);
         Meal friday = findMealForDay(DayOfWeek.FRIDAY);
         String altRef = findAlternativeRecipe(friday.getRecipeRef());
         planService.swapMeal(friday.getId(), altRef, "fish swap for IT why test");
 
-        page.navigate(getUrl() + "/plan");
+        page.navigate("plan");
 
         chatModel.queueReply("I swapped Friday because of your fish allergy preference.");
 
         // Focus the chat input to expand the dock so the message list is visible
-        var chatDockLocator = page.getByTestId("chat-dock");
+        // TODO unified: Dramafinder Escape Hatch: playwright.getByTestId("chat-dock")
+        var chatDockLocator = playwright.getByTestId("chat-dock");
+        // TODO unified: Dramafinder Escape Hatch: MessageInputElement.get(chatDockLocator)
         MessageInputElement input = MessageInputElement.get(chatDockLocator);
+        // TODO unified: Dramafinder Escape Hatch: input.focus()
         input.focus();
 
         // Click the "why?" button for Friday — this pre-fills and submits the chat prompt
-        page.locator("#mise-meal-why-friday").click();
+        // TODO unified: was locator("#mise-meal-why-friday"): no view in the sources sets this id; UnifiedContainer finds any component, use the component's own Wrapper if it has one
+        page.find(UnifiedContainer.class).withId("mise-meal-why-friday").click();
 
         // Wait for both user message and assistant reply to land (total = 2)
-        MessageListElement messages = new MessageListElement(page.getByTestId("chat-message-list"));
+        // TODO unified: Dramafinder Escape Hatch: new MessageListElement(playwright.getByTestId("chat-message-list"))
+        MessageListElement messages = new MessageListElement(playwright.getByTestId("chat-message-list"));
+        // TODO unified: Dramafinder Escape Hatch: messages.assertMessageCount(2)
         messages.assertMessageCount(2);
 
         // The first message must be the user turn containing the why-prompt text
-        assertThat(page.getByTestId("chat-message-list")
+        // TODO unified: Dramafinder Escape Hatch: assertThat(playwright.getByTestId("chat-message-list").locator("vaadin-message").first()).containsText("why did you change Friday?")
+        assertThat(playwright.getByTestId("chat-message-list")
                 .locator("vaadin-message").first())
                 .containsText("why did you change Friday?");
     }
@@ -491,14 +591,16 @@ class PlanViewIT extends MisePlaywrightIT {
      * UC-004 AC: the "why?" button is visible on a row that has edit history.
      */
     @Test
-    void whyButtonVisibleOnRowWithEditHistory() {
+    void whyButtonVisibleOnRowWithEditHistory(UnifiedPage page) {
+        page.navigate(PlanView.class);
         Meal tuesday = findMealForDay(DayOfWeek.TUESDAY);
         String altRef = findAlternativeRecipe(tuesday.getRecipeRef());
         planService.swapMeal(tuesday.getId(), altRef, "swap for IT why-visible test");
 
-        page.navigate(getUrl() + "/plan");
+        page.navigate("plan");
 
-        assertThat(page.locator("#mise-meal-why-tuesday")).isVisible();
+        // TODO unified: was locator("#mise-meal-why-tuesday"): no view in the sources sets this id; UnifiedContainer finds any component, use the component's own Wrapper if it has one
+        com.vaadin.testing.unified.assertion.UnifiedAssertions.assertThat(page.find(UnifiedContainer.class).withId("mise-meal-why-tuesday")).isVisible();
     }
 
     /**
@@ -506,7 +608,10 @@ class PlanViewIT extends MisePlaywrightIT {
      * Vaadin notification. The service layer throws PinnedMealException; the UI surfaces it.
      */
     @Test
-    void undoOnPinnedMealShowsPinnedNotification() {
+    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    void undoOnPinnedMealShowsPinnedNotification(UnifiedPage page) {
+        Page playwright = page.unwrap(Page.class);
+        page.navigate(PlanView.class);
         Meal monday = findMealForDay(DayOfWeek.MONDAY);
         String altRef = findAlternativeRecipe(monday.getRecipeRef());
 
@@ -515,13 +620,15 @@ class PlanViewIT extends MisePlaywrightIT {
         // Then pin the meal so undoLastEdit() throws PinnedMealException
         planService.setPinned(monday.getId(), true, Meal.Editor.USER);
 
-        page.navigate(getUrl() + "/plan");
+        page.navigate("plan");
 
         // Click the per-day undo button for Monday
-        page.locator("#mise-meal-undo-monday").click();
+        // TODO unified: was locator("#mise-meal-undo-monday"): no view in the sources sets this id; UnifiedContainer finds any component, use the component's own Wrapper if it has one
+        page.find(UnifiedContainer.class).withId("mise-meal-undo-monday").click();
 
         // The view must surface the pinned-rejection notification
-        assertThat(page.getByText("Cannot undo — meal is pinned")).isVisible();
+        // TODO unified: Dramafinder Escape Hatch: assertThat(playwright.getByText("Cannot undo — meal is pinned")).isVisible()
+        assertThat(playwright.getByText("Cannot undo — meal is pinned")).isVisible();
     }
 
     /**
@@ -529,19 +636,24 @@ class PlanViewIT extends MisePlaywrightIT {
      * confirming that a successful undo doesn't break the view's KPI rendering.
      */
     @Test
-    void kpiStripStillRenderedAfterUndo() {
+    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    void kpiStripStillRenderedAfterUndo(UnifiedPage page) {
+        Page playwright = page.unwrap(Page.class);
+        page.navigate(PlanView.class);
         Meal wednesday = findMealForDay(DayOfWeek.WEDNESDAY);
         String altRef = findAlternativeRecipe(wednesday.getRecipeRef());
         planService.swapMeal(wednesday.getId(), altRef, "swap for IT kpi-post-undo test");
 
-        page.navigate(getUrl() + "/plan");
+        page.navigate("plan");
 
-        page.locator("#mise-meal-undo-wednesday").click();
+        // TODO unified: was locator("#mise-meal-undo-wednesday"): no view in the sources sets this id; UnifiedContainer finds any component, use the component's own Wrapper if it has one
+        page.find(UnifiedContainer.class).withId("mise-meal-undo-wednesday").click();
 
         // Confirm undo applied
-        assertThat(page.getByText("Undo applied")).isVisible();
+        // TODO unified: Dramafinder Escape Hatch: assertThat(playwright.getByText("Undo applied")).isVisible()
+        assertThat(playwright.getByText("Undo applied")).isVisible();
 
         // KPI strip must still be visible after the view refreshes
-        assertThat(page.getByTestId("kpi-strip")).isVisible();
+        com.vaadin.testing.unified.assertion.UnifiedAssertions.assertThat(page.find(UnifiedContainer.class).withTestId("kpi-strip")).isVisible();
     }
 }

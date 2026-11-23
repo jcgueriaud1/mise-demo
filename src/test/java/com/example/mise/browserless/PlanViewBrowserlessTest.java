@@ -11,14 +11,17 @@ import com.example.mise.domain.plan.PlanRepository;
 import com.example.mise.domain.plan.PlanService;
 import com.example.mise.it.support.TestAiConfig;
 import com.example.mise.ui.plan.PlanView;
-import com.vaadin.browserless.SpringBrowserlessTest;
 import com.vaadin.flow.component.button.Button;
+import com.vaadin.testing.unified.RequiresTestingTool;
+import com.vaadin.testing.unified.TestingTool;
+import com.vaadin.testing.unified.UnifiedPage;
+import com.vaadin.testing.unified.browserless.BrowserlessEscapeHatch;
+import com.vaadin.testing.unified.spring.UnifiedSpringBootTest;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 
@@ -41,10 +44,10 @@ import java.util.List;
  * and run via {@code ./mvnw -Pai-it verify}; this Browserless layer covers the
  * UI affordances they intentionally skip (component-tree, click handlers).
  */
-@SpringBootTest
+@UnifiedSpringBootTest
 @ActiveProfiles("it")
 @Import(TestAiConfig.class)
-class PlanViewBrowserlessTest extends SpringBrowserlessTest {
+class PlanViewBrowserlessTest {
 
     @Autowired private HouseholdService householdService;
     @Autowired private HouseholdRepository householdRepository;
@@ -88,7 +91,9 @@ class PlanViewBrowserlessTest extends SpringBrowserlessTest {
      * harness is wired and the affordance is findable by stable id.
      */
     @Test
-    void rowUndoButtonRestoresPreviousRecipeAndWritesAuditRow() {
+    @RequiresTestingTool(TestingTool.BROWSERLESS)
+    void rowUndoButtonRestoresPreviousRecipeAndWritesAuditRow(UnifiedPage page) {
+        BrowserlessEscapeHatch browserless = BrowserlessEscapeHatch.of(page);
         // Pre-seed an AI swap on Friday so the row carries edit history.
         var household = householdService.findHousehold().orElseThrow();
         var plan = planService.findActivePlan(household.getId()).orElseThrow();
@@ -102,10 +107,12 @@ class PlanViewBrowserlessTest extends SpringBrowserlessTest {
                 .findFirst().orElseThrow();
         planService.swapMeal(friday.getId(), swapTarget, "Browserless setup");
 
-        navigate(PlanView.class);
+        page.navigate(PlanView.class);
 
-        var undoBtn = $(Button.class).id("mise-meal-undo-friday");
-        test(undoBtn).click();
+        // TODO unified: Browserless Escape Hatch: $(Button.class).id("mise-meal-undo-friday")
+        var undoBtn = browserless.$(Button.class).id("mise-meal-undo-friday");
+        // TODO unified: Component Reference: test(undoBtn).click(): replace it with a locator that finds the same component
+        browserless.test(undoBtn).click();
 
         var fridayAfter = mealRepository.findById(friday.getId()).orElseThrow();
         var fridayEdits = mealEditRepository.findByMealIdOrderByChangedAtDesc(friday.getId());

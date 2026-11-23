@@ -9,14 +9,18 @@ import com.example.mise.domain.plan.MealEditRepository;
 import com.example.mise.domain.plan.MealRepository;
 import com.example.mise.domain.plan.PlanRepository;
 import com.example.mise.domain.plan.PlanService;
+import com.example.mise.ui.plan.PlanView;
+
 import com.microsoft.playwright.Page;
+import com.vaadin.testing.unified.RequiresTestingTool;
+import com.vaadin.testing.unified.TestingTool;
+import com.vaadin.testing.unified.UnifiedPage;
+import com.vaadin.testing.unified.spring.UnifiedSpringBootTest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.test.context.ActiveProfiles;
 import org.vaadin.addons.dramafinder.AbstractBasePlaywrightIT;
@@ -41,10 +45,10 @@ import java.util.List;
  * the whole essay before "stop" arrived there would be no {@code (stopped)} marker; that is the one
  * documented way this gate can legitimately flake, and it is run by intention before a release.
  */
-@SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT)
+@UnifiedSpringBootTest
 @ActiveProfiles("manual")
 @Tag("manual-example")
-class ManualExamplesStopIT extends AbstractBasePlaywrightIT {
+class ManualExamplesStopIT {
 
     /** Matches {@link ManualExamplesReportsIT}: the live turn can chain several slow calls. */
     private static final long REPLY_TIMEOUT_MS = 300_000L;
@@ -65,17 +69,6 @@ class ManualExamplesStopIT extends AbstractBasePlaywrightIT {
 
     private Household household;
 
-    @Override
-    public String getUrl() {
-        return "http://localhost:" + port;
-    }
-
-    @Override
-    public String getView() {
-        return "/plan";
-    }
-
-    @Override
     @BeforeEach
     public void setupTest() throws Exception {
         Household h = new Household();
@@ -86,9 +79,7 @@ class ManualExamplesStopIT extends AbstractBasePlaywrightIT {
         h.setHatedFoods(List.of());
         householdService.save(h);
         household = householdService.findHousehold().orElseThrow();
-        planService.generateActivePlan(household, recipeCatalog);
-
-        super.setupTest(); // navigates to getUrl() + getView() == /plan
+        planService.generateActivePlan(household, recipeCatalog); // navigates to getUrl() + getView() == /plan
     }
 
     @AfterEach
@@ -106,31 +97,41 @@ class ManualExamplesStopIT extends AbstractBasePlaywrightIT {
 
     // ── UC-013 — "stop" cancels an in-flight turn ───────────────────────────────
     @Test
-    void stopCancelsAnInFlightTurn() {
-        var chatDock = page.getByTestId("chat-dock");
+    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    void stopCancelsAnInFlightTurn(UnifiedPage page) {
+        Page playwright = page.unwrap(Page.class);
+        page.navigate(PlanView.class);
+        // TODO unified: Dramafinder Escape Hatch: playwright.getByTestId("chat-dock")
+        var chatDock = playwright.getByTestId("chat-dock");
 
         // A deliberately long generation so the turn stays in flight long enough to interrupt.
+        // TODO unified: Dramafinder Escape Hatch: MessageInputElement.get(chatDock).typeAndSubmit("Write an extremely long, exhaustive 2000-word essay covering the complete history, "+ "botany, cultivation, global culinary traditions, and folklore of garlic. Be very "+ "thorough and detailed.")
         MessageInputElement.get(chatDock).typeAndSubmit(
                 "Write an extremely long, exhaustive 2000-word essay covering the complete history, "
                 + "botany, cultivation, global culinary traditions, and folklore of garlic. Be very "
                 + "thorough and detailed.");
 
         // Wait until the turn is solidly in flight: .ai-working set and a good chunk streamed.
-        page.waitForFunction("d => d.classList.contains('ai-working')", chatDock.elementHandle(),
+        // TODO unified: Dramafinder Escape Hatch: playwright.waitForFunction("d => d.classList.contains('ai-working')", chatDock.elementHandle(),new Page.WaitForFunctionOptions().setTimeout(REPLY_TIMEOUT_MS))
+        playwright.waitForFunction("d => d.classList.contains('ai-working')", chatDock.elementHandle(),
                 new Page.WaitForFunctionOptions().setTimeout(REPLY_TIMEOUT_MS));
-        page.waitForFunction(
+        // TODO unified: Dramafinder Escape Hatch: playwright.waitForFunction("min => { const m = [...document.querySelectorAll('vaadin-message')].pop();"+ " return m && (m.textContent || '').length > min; }",MID_STREAM_CHARS, new Page.WaitForFunctionOptions().setTimeout(REPLY_TIMEOUT_MS))
+        playwright.waitForFunction(
                 "min => { const m = [...document.querySelectorAll('vaadin-message')].pop();"
                 + " return m && (m.textContent || '').length > min; }",
                 MID_STREAM_CHARS, new Page.WaitForFunctionOptions().setTimeout(REPLY_TIMEOUT_MS));
 
         // Stop it.
+        // TODO unified: Dramafinder Escape Hatch: MessageInputElement.get(chatDock).typeAndSubmit("stop")
         MessageInputElement.get(chatDock).typeAndSubmit("stop");
 
         // The turn must end because we stopped it: .ai-working clears...
-        page.waitForFunction("d => !d.classList.contains('ai-working')", chatDock.elementHandle(),
+        // TODO unified: Dramafinder Escape Hatch: playwright.waitForFunction("d => !d.classList.contains('ai-working')", chatDock.elementHandle(),new Page.WaitForFunctionOptions().setTimeout(REPLY_TIMEOUT_MS))
+        playwright.waitForFunction("d => !d.classList.contains('ai-working')", chatDock.elementHandle(),
                 new Page.WaitForFunctionOptions().setTimeout(REPLY_TIMEOUT_MS));
         // ...and the partial reply is kept, marked (stopped).
-        page.waitForFunction(
+        // TODO unified: Dramafinder Escape Hatch: playwright.waitForFunction("() => [...document.querySelectorAll('vaadin-message')]"+ ".some(m => /\\(stopped\\)/.test(m.textContent || ''))",null, new Page.WaitForFunctionOptions().setTimeout(30_000L))
+        playwright.waitForFunction(
                 "() => [...document.querySelectorAll('vaadin-message')]"
                 + ".some(m => /\\(stopped\\)/.test(m.textContent || ''))",
                 null, new Page.WaitForFunctionOptions().setTimeout(30_000L));

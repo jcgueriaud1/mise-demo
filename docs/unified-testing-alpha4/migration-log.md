@@ -12,7 +12,7 @@ Issues found along the way: [`findings.md`](findings.md)
 | 1 | Bump Vaadin 25.2.6 → 25.3.5 | **Done**: unit 193 ✓, IT 74 ✓, AIIT not run (no endpoint) |
 | 2 | Bump DramaFinder 1.2.0 → 2.2.1 (baseline) | **Done**: unit 193 ✓, IT 74 ✓, no code changes |
 | 3 | Dry run `FindTestClassesToMigrate`, unblock, re-run | **Done**: 3/13 → 13/13 "migrates" in 2 dry runs, 1 hand edit |
-| 4 | Run the Migration Recipes, unassisted | |
+| 4 | Run the Migration Recipes | **Done**: 13/13 converted in one run, 228 markers, PW 74 ✓ with no hand edits |
 | 5 | Unblock skipped classes (if any), re-run | **Folded into step 3** (the guide's dry-run loop) |
 | 6 | Configure the test layers (Playwright + Browserless) | |
 | 7 | Resolve the Migration Markers, class by class | |
@@ -163,3 +163,54 @@ That reason is exact: the `@RegisterExtension TestWatcher` reads `page` to take 
 **Deviation from the plan:** the plan had step 4 run the recipe on the untouched suite. The guide's documented workflow is to dry-run, fix and re-run until nothing is skipped, and the dry run had already answered what step 4 was meant to measure. So I followed the guide, and step 5 ("unblock and re-run") is folded in here.
 
 **How it went (about 5 minutes):** this is where alpha4 improves most on alpha3. alpha3's recipe skipped 11 of 12 ITs without a word. Getting to 12/12 took two elimination passes, each comparing converted and skipped classes, plus hand-moving the annotations, `getUrl()`, `port` and `chatModel` out of the base class (alpha3 log, step 5). alpha4 named the one real blocker on the first pass, in a CSV, and handled everything else itself (still to confirm in step 4).
+
+---
+
+## Step 4: Run the Migration Recipes (2026-11-23)
+
+**Command.** `rewrite.yml` at the project root declares `com.example.mise.MigrateToUnified`, which runs `MigrateBrowserlessToUnified` and then `MigrateDramafinderToUnified` with `addBrowserless: true` and `addAgentSkill: true`. This is the same file as alpha3's.
+```bash
+./mvnw org.openrewrite.maven:rewrite-maven-plugin:6.46.1:run \
+  -Drewrite.recipeArtifactCoordinates=org.vaadin.addons:unified-test-rewrite:0.1.0-alpha4 \
+  -Drewrite.activeRecipes=com.example.mise.MigrateToUnified
+```
+The run took 20 s. The plugin's "estimate time saved" was **5h 55m**, against alpha3's 1h 10m for its first pass. No validation error this time (F12 fixed).
+
+**What the recipes did**
+- **`pom.xml`:**
+  - imported `unified-test-bom` 0.1.0-alpha4, after the Vaadin and Spring AI BOMs
+  - added `unified-test-browserless`, `unified-test-playwright` and `unified-test-spring`
+  - removed `dramafinder` and `browserless-test-junit6`, which now arrive transitively
+  - **removed the hard-coded `1.1.2` from `browserless-test-spring`** (F14 fixed)
+- **All 13 classes converted in one run.** alpha3 converted 2 of 13 on the first run. Each IT got:
+  - `@UnifiedSpringBootTest` + **`@ActiveProfiles("it")` + `@Import(TestAiConfig.class)` copied from the base class** (F10 fixed)
+  - its own `@Autowired TestChatModel chatModel` and the `@BeforeEach` that resets it
+  - `getView()` → `page.navigate(PlanView.class)` (by route class, F25 fixed)
+  - `page.navigate(getUrl() + "/plan")` → `page.navigate("plan")` (F16 fixed; the path stays a string, see G7)
+- **`MisePlaywrightIT` was deleted**, since nothing extends it any more.
+- **`ManualExamples*`** keep their own `@ActiveProfiles("manual") @Tag("manual-example")`.
+- **New files:**
+  - **both** `.claude/skills/write-unified-ui-tests/SKILL.md` and `.claude/skills/resolve-migration-markers/SKILL.md` (F11 fixed)
+  - a marked section at the end of **`CLAUDE.md`** pointing to the first, with no `AGENTS.md` (F15 fixed)
+- Comments above marked statements stay where they were (F19 fixed).
+
+**Migration Markers: 228** (alpha3: 285).
+
+| Kind | Count |
+|---|---|
+| Dramafinder Escape Hatch, of which: | 217 |
+| `locator(..)` with an assertion the recipe doesn't convert | 46 |
+| `waitForFunction` / `evaluate` (computed CSS, scroll position, classes) | 33 |
+| `MessageInputElement` / `MessageListElement` calls not converted (scoped `get(locator)`, `focus()`, `getMessage(i)`) | about 40 |
+| `getByTestId(..)` used as a scope, `getByText`, `url()`, `reload()`, `count()` and other | rest |
+| `was locator(..)` / `was getByTestId(..)`: an id built at runtime (`"mise-meal-undo-" + day`) or a test id passed to a constructor, so no view "sets" it; becomes `UnifiedContainer` | 9 |
+| Browserless Escape Hatch + Component Reference (`PlanViewBrowserlessTest`) | 2 |
+
+The raw locator conversion did fire: **22 `withId(..)` and 17 `withTestId(..)`** lookups were written, for example `page.find(UnifiedButton.class).withId("mise-week-next").click()`. But the most common locator in the suite, `#mise-week-badge` (21 uses), is always checked with `containsText(..)`, `hasClass(..)` or `hasAttribute("disabled", ..)`. None of those is in the converted set, which is `isVisible`, `isEnabled`, `isDisabled`, `hasValue` and `isChecked` (G4). The chat Wrappers were used in 4 places. Most chat code is scoped to the dock (`MessageInputElement.get(playwright.getByTestId("chat-dock"))`) or calls `focus()`, and the recipe leaves those (G5).
+
+**Results.** Compiles first time.
+- `./mvnw -Pit verify -Dvaadin.testing.tool=playwright`: **74 ✓** in **51 s** (baseline 83 s). Surefire: 193 with 1 skipped (`PlanViewBrowserlessTest`, because the `-D` also reaches surefire; step 6 scopes it, as in alpha3).
+- New in alpha4: `summary.md` lists **62 of 74 "Scenarios without a check"**. That is accurate: their checks are still raw Playwright `assertThat` behind the Escape Hatch, which the recorder can't see. It works as a to-do list for step 7. `summary.json` records the commit and the uncommitted-changes hash.
+- The surefire and failsafe runs write to the same `target/surefire-reports/unified-evidence/`. The summary says "74 passed, 1 skipped", mixing the two phases (G6).
+
+**How it went (about 15 minutes, mostly reading the diff):** the biggest single improvement over alpha3. alpha3 went 2/13 → (hand prep, 2 iterations) → 12/12 + 285 markers. alpha4 went 13/13 in one run, with the right annotations and fixtures, green on Playwright before any marker was touched. Fewer markers remain, and they are more focused: almost all are real Escape Hatch checks (CSS, scroll, DOM structure) or assertion kinds the recipe doesn't map yet.

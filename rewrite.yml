@@ -1,0 +1,7 @@
+type: specs.openrewrite.org/v1beta/recipe
+name: com.example.mise.MigrateToUnified
+recipeList:
+  - org.vaadin.addons.unified.rewrite.MigrateBrowserlessToUnified
+  - org.vaadin.addons.unified.rewrite.MigrateDramafinderToUnified:
+      addBrowserless: true
+      addAgentSkill: true

@@ -92,3 +92,9 @@ The first three commits carry the spec. Two prep branches build the runtime back
 - `app/mise-prep-2` — AI backbone (Spring AI ↔ Vaadin `AIOrchestrator` ↔ persisted conversation) round-tripped against the live Qwen endpoint, then reloaded after restart.
 
 Use cases UC-001..UC-009 are specified and ready to implement, starting with UC-001 (onboarding) to populate a household.
+
+<!-- unified-test: write-unified-ui-tests -->
+## Unified UI Tests
+
+For Unified UI Tests, follow `.claude/skills/write-unified-ui-tests/SKILL.md`.
+<!-- /unified-test -->

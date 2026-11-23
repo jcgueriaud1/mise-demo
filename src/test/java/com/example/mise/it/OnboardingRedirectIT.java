@@ -3,11 +3,21 @@ package com.example.mise.it;
 import com.example.mise.domain.household.Household;
 import com.example.mise.domain.household.HouseholdRepository;
 import com.example.mise.domain.household.HouseholdService;
+import com.example.mise.it.support.TestAiConfig;
+import com.example.mise.it.support.TestChatModel;
+import com.example.mise.ui.onboarding.OnboardingView;
 
+import com.microsoft.playwright.Page;
+import com.vaadin.testing.unified.RequiresTestingTool;
+import com.vaadin.testing.unified.TestingTool;
+import com.vaadin.testing.unified.UnifiedPage;
+import com.vaadin.testing.unified.spring.UnifiedSpringBootTest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
+import org.springframework.test.context.ActiveProfiles;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -33,7 +43,19 @@ import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertTha
  * <p>Cleanup: {@code @AfterEach} deletes all household rows so the shared in-memory H2 and
  * Spring context stay clean for other ITs. {@code @DirtiesContext} is not needed.
  */
-class OnboardingRedirectIT extends MisePlaywrightIT {
+@UnifiedSpringBootTest
+@ActiveProfiles("it")
+@Import(TestAiConfig.class)
+class OnboardingRedirectIT {
+
+    @Autowired
+    protected TestChatModel chatModel;
+
+    @BeforeEach
+    void resetChatModelBetweenTests() {
+        chatModel.reset();
+    }
+
 
     @Autowired
     private HouseholdService householdService;
@@ -41,16 +63,10 @@ class OnboardingRedirectIT extends MisePlaywrightIT {
     @Autowired
     private HouseholdRepository householdRepository;
 
-    @Override
-    public String getView() {
-        return "/welcome";
-    }
-
     /**
      * Override: seed the Household before the base class navigates to /welcome.
      * The base @BeforeEach on the same method name is hidden by this override in JUnit 5.
      */
-    @Override
     @BeforeEach
     public void setupTest() throws Exception {
         Household h = new Household();
@@ -60,9 +76,6 @@ class OnboardingRedirectIT extends MisePlaywrightIT {
         h.setAllergies(List.of());
         h.setHatedFoods(List.of());
         householdService.save(h);
-
-        // Navigate after seeding so BeforeEnterObserver finds the existing household.
-        super.setupTest();
     }
 
     @AfterEach
@@ -74,7 +87,11 @@ class OnboardingRedirectIT extends MisePlaywrightIT {
      * BR-01: navigating to /welcome when a Household already exists redirects to /plan.
      */
     @Test
-    void existingHouseholdRedirectsToPlan() {
-        assertThat(page).hasURL(Pattern.compile(".*/plan.*"));
+    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    void existingHouseholdRedirectsToPlan(UnifiedPage page) {
+        Page playwright = page.unwrap(Page.class);
+        page.navigate(OnboardingView.class);
+        // TODO unified: Dramafinder Escape Hatch: assertThat(playwright).hasURL(Pattern.compile(".*/plan.*"))
+        assertThat(playwright).hasURL(Pattern.compile(".*/plan.*"));
     }
 }

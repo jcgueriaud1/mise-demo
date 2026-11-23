@@ -1,6 +1,19 @@
 package com.example.mise.it;
 
+import com.example.mise.it.support.TestAiConfig;
+import com.example.mise.it.support.TestChatModel;
+import com.example.mise.ui.HomeView;
+
+import com.microsoft.playwright.Page;
+import com.vaadin.testing.unified.RequiresTestingTool;
+import com.vaadin.testing.unified.TestingTool;
+import com.vaadin.testing.unified.UnifiedPage;
+import com.vaadin.testing.unified.spring.UnifiedSpringBootTest;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
+import org.springframework.test.context.ActiveProfiles;
 
 import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
 
@@ -9,28 +22,46 @@ import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertTha
  * against the simplest view in the app. Intentionally does not interact with the chat panel
  * or any AI surface: those are covered by separate ITs that stub the {@code ChatModel}.
  */
-class HomeViewIT extends MisePlaywrightIT {
+@UnifiedSpringBootTest
+@ActiveProfiles("it")
+@Import(TestAiConfig.class)
+class HomeViewIT {
 
-    @Override
-    public String getView() {
-        return "/debug";
+    @Autowired
+    protected TestChatModel chatModel;
+
+    @BeforeEach
+    void resetChatModelBetweenTests() {
+        chatModel.reset();
     }
 
     @Test
-    void hasPageTitle() {
-        assertThat(page).hasTitle("Mise — Debug");
+    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    void hasPageTitle(UnifiedPage page) {
+        Page playwright = page.unwrap(Page.class);
+        page.navigate(HomeView.class);
+        // TODO unified: Dramafinder Escape Hatch: assertThat(playwright).hasTitle("Mise — Debug")
+        assertThat(playwright).hasTitle("Mise — Debug");
     }
 
     @Test
-    void rendersStageHeader() {
-        assertThat(page.getByRole(com.microsoft.playwright.options.AriaRole.HEADING)
+    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    void rendersStageHeader(UnifiedPage page) {
+        Page playwright = page.unwrap(Page.class);
+        page.navigate(HomeView.class);
+        // TODO unified: Dramafinder Escape Hatch: assertThat(playwright.getByRole(com.microsoft.playwright.options.AriaRole.HEADING).filter(new com.microsoft.playwright.Locator.FilterOptions().setHasText("Mise — prep build (stage 2)"))).isVisible()
+        assertThat(playwright.getByRole(com.microsoft.playwright.options.AriaRole.HEADING)
                 .filter(new com.microsoft.playwright.Locator.FilterOptions()
                         .setHasText("Mise — prep build (stage 2)")))
                 .isVisible();
     }
 
     @Test
-    void showsStoredMessageCount() {
-        assertThat(page.getByText("Stored messages:")).isVisible();
+    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    void showsStoredMessageCount(UnifiedPage page) {
+        Page playwright = page.unwrap(Page.class);
+        page.navigate(HomeView.class);
+        // TODO unified: Dramafinder Escape Hatch: assertThat(playwright.getByText("Stored messages:")).isVisible()
+        assertThat(playwright.getByText("Stored messages:")).isVisible();
     }
 }

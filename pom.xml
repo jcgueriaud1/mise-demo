@@ -49,6 +49,13 @@
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
+            <dependency>
+                <groupId>org.vaadin.addons</groupId>
+                <artifactId>unified-test-bom</artifactId>
+                <version>0.1.0-alpha4</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
         </dependencies>
     </dependencyManagement>
     
@@ -72,23 +79,25 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
-        <dependency>
-            <groupId>com.vaadin</groupId>
-            <artifactId>browserless-test-junit6</artifactId>
-            <scope>test</scope>
-        </dependency>
         <!-- Spring integration for Browserless: SpringBrowserlessTest, route+bean wiring. -->
         <dependency>
             <groupId>com.vaadin</groupId>
             <artifactId>browserless-test-spring</artifactId>
-            <version>1.1.2</version>
             <scope>test</scope>
         </dependency>
-        <!-- DramaFinder: Playwright element wrappers for Vaadin. Activated via -Pit. -->
         <dependency>
             <groupId>org.vaadin.addons</groupId>
-            <artifactId>dramafinder</artifactId>
-            <version>2.2.1</version>
+            <artifactId>unified-test-browserless</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.vaadin.addons</groupId>
+            <artifactId>unified-test-playwright</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.vaadin.addons</groupId>
+            <artifactId>unified-test-spring</artifactId>
             <scope>test</scope>
         </dependency>
 
