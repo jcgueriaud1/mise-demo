@@ -86,6 +86,16 @@ The first version of the picker test passed on Browserless and failed on Playwri
 A label changed from "Previous week" to "Previous Week" gets `Did you mean find(UnifiedButton.class).withAccessibleName("Previous Week")`, and `ApplyDidYouMean` applies it. Changed to "Go to previous week", it gets none, though that button is the first `Nearby`. Not guessing is reasonable, but the guide doesn't say how close a near miss must be. Also, the suggestion is in `summary.md` and `user-steps.json`, while `user-steps.txt`, the file the skill tells you to read, shows only `Expected` and `Found`.
 **Suggestion:** document the threshold, and add the `Did you mean` line to `user-steps.txt`'s failure block.
 
+### G15: The bundled skill and API reference don't mention the evidence settings, so an agent concludes screenshots come only on failure. Verified · docs
+
+Asked "how do I run the tests with screenshots on Playwright and Browserless?", an agent working from the files shipped with alpha4 answered that there is no option: evidence is written only when a test fails. Wrong. `vaadin.testing.user-steps.snapshots=true` (alpha3, #271) writes a screenshot (browsers) or a component tree (Browserless) after every User Step, and `vaadin.testing.playwright.trace=on|on-failure` keeps `trace.zip`. Both are read by `Settings` / `PlaywrightSession` in the alpha4 jars, and the alpha3 release notes document them. But the agent-facing docs don't:
+- `META-INF/unified/api-reference.md` lists only `page.screenshot(Path)`.
+- The bundled `write-unified-ui-tests/SKILL.md` names `vaadin.testing.timeout` and `page.secret(..)`, and describes `Evidence` as written on failure. No other `vaadin.testing.*` setting appears.
+- Of the 21 `vaadin.testing.*` settings in the jars (`evidence-dir`, `user-steps.snapshots`, `user-steps.log`, `user-steps.compare-dir`, `user-steps.baseline-dir`, `user-steps.changed-since`, `playwright.trace`, `playwright.headless`, …), the offline docs name two: `tool` and `timeout`.
+
+Release notes describe a feature once, at the release that adds it; the per-release skill and API reference are what an agent reads, and they drop it.
+**Suggestion:** add a short "Configuration" section to the bundled `SKILL.md` (or `api-reference.md`) listing every `vaadin.testing.*` setting with its default, and say in the evidence paragraph that per-step snapshots and traces are opt-in.
+
 ## alpha3 findings re-checked
 
 | alpha3 | Status in alpha4 | Evidence |
@@ -144,3 +154,4 @@ A label changed from "Previous week" to "Previous Week" gets `Did you mean find(
 | G12 | "Compared with Browserless" catches Browserless-only passes | positive |
 | G13 | Findable View differs between tools; unhelpful "not unique" hint | reports |
 | G14 | `Did you mean` threshold undocumented, missing from `user-steps.txt` | reports, minor |
+| G15 | Evidence settings (`user-steps.snapshots`, `playwright.trace`, …) missing from the bundled skill and API reference | docs |

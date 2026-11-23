@@ -89,6 +89,23 @@ End-to-end tests live next to the unit tests in `src/test/java/.../it/` and are 
 
 Each run writes a report per tool to `target/failsafe-reports/{browserless,playwright}/unified-evidence/`: `summary.md` / `report.html`, and every test's User Steps (`user-steps.txt`) — plus a screenshot or component tree when a test fails. The Playwright summary compares the run with the Browserless one and lists any test that passed on one tool and failed on the other.
 
+#### Evidence after every step (opt-in)
+
+To see what each step looked like, not just the failing one, turn on per-step snapshots and the Playwright trace:
+
+```bash
+./mvnw -Pit verify -Dit.test=HomeViewIT \
+  -Dvaadin.testing.user-steps.snapshots=true \
+  -Dvaadin.testing.playwright.trace=on
+```
+
+- `vaadin.testing.user-steps.snapshots=true` writes a snapshot after every User Step into `<TestClass>/<testMethod>/steps/` under each tool's evidence folder: `001.png`, `002.png`, … on Playwright, and `001.tree.txt` / `001.tree.html`, … on Browserless (a component tree: it has no browser to take a picture with).
+- `vaadin.testing.playwright.trace=on` keeps Playwright's trace as `trace.zip`, grouped by User Step (`on-failure` keeps it only for failing tests). Open it with `npx playwright show-trace <path>/trace.zip`.
+
+Both make runs slower and the reports bigger, so use them on one class rather than the whole suite.
+
+Open the two `*IT` reports with `open target/failsafe-reports/browserless/unified-evidence/report.html` and `open target/failsafe-reports/playwright/unified-evidence/report.html`. `target/surefire-reports/unified-evidence/` is the unit-test phase: it only holds `PlanViewBrowserlessTest`, the one Unified test named `*Test`.
+
 #### Headed (visible browser) mode
 
 The `debug-ui` profile flips Playwright out of headless mode so you can watch the browser drive itself. **A graphical display is required** — this won't work inside the dev container by default. Run it from a host with a desktop, or wire up Xvfb / a VNC display first.
