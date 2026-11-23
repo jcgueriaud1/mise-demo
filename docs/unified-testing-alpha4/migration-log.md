@@ -18,7 +18,7 @@ Issues found along the way: [`findings.md`](findings.md)
 | 7 | Resolve the Migration Markers, class by class | **Done**: 228 → 9 (live-LLM ITs, open); BL 70 ✓ + 2 skipped, PW 72 ✓ |
 | 8 | `UnifiedStyleTest` (ArchUnit style rules) | **Done**: green; only the live-LLM ITs excluded |
 | 9 | Try alpha4's new tooling on the migrated suite | **Done**: 1 regression test added; 2 findings |
-| 10 | Docs, skills, memory | **Done**; `spec/architecture.md` pending approval |
+| 10 | Docs, skills, memory | **Done** (`spec/architecture.md` in 10b, after approval) |
 | 11 | Full verification + comparison with alpha3 | **Done**: unit 194 ✓, BL 73 ✓ + 2 skipped, PW 75 ✓; AIIT not run |
 
 Convention: **one commit per step**, message `unified-testing-alpha4: step N, <what>`. Each commit appends its entry below and any new issue to `findings.md`.
@@ -583,7 +583,7 @@ For comparison, the DramaFinder baseline (step 2) took 83 s for Playwright alone
 ### Open items
 
 1. **The live-LLM ITs.** `ManualExamplesReportsIT` and `ManualExamplesStopIT` still have 9 Migration Markers. Resolve them with a live endpoint and `-Pmanual-verify`, then drop their filter from `UnifiedStyleTest`.
-2. **`spec/architecture.md`.** Needs approval (the proposed change is in the wrap-up).
+2. ~~**`spec/architecture.md`.**~~ Applied after approval (step 10b).
 3. **AIIT.** Run `./mvnw -Pai-it verify` against the live model.
 4. **Upstream.** File G1–G14, or the non-positive ones, against parttio/unified-testing-tool, as was done for alpha3 (#368). Not done: that's an outward-facing action left to the user.
 
@@ -610,3 +610,13 @@ f947d82 unified-testing-alpha4: step 7h, resolve markers in WeekNavigationIT
 5ecc967 unified-testing-alpha4: step 10, update docs, skills and memory for Unified UI Tests
 (+ this step 11 commit)
 ```
+
+---
+
+## Step 10b: `spec/architecture.md`, approved (2026-11-23)
+
+The user approved the update. `spec/architecture.md` now has:
+- **Stack:** Vaadin Flow **25.3.5**, with the AI components in `vaadin-ai-core-flow` / `vaadin-ai-extensions-flow` and the `AIController` callback change.
+- **Spring AI pin list:** + `25.3.5 → 2.0.1`, checked in `vaadin-ai-core-flow`'s POM.
+- **Test stack:** the Browserless and DramaFinder bullets are replaced by one Unified UI Tests bullet: both tools, the `-Pit` executions, the class annotations, the `@RequiresBrowser` / `@RequiresTestingTool` exceptions, `UnifiedStyleTest`.
+- **§5 Build & Run:** the `test` / `-Pit` comments.
