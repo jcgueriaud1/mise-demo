@@ -11,9 +11,9 @@ Issues found along the way: [`findings.md`](findings.md)
 | 0 | Research, inventory, plan | **Done** |
 | 1 | Bump Vaadin 25.2.6 → 25.3.5 | **Done**: unit 193 ✓, IT 74 ✓, AIIT not run (no endpoint) |
 | 2 | Bump DramaFinder 1.2.0 → 2.2.1 (baseline) | **Done**: unit 193 ✓, IT 74 ✓, no code changes |
-| 3 | Dry run `FindTestClassesToMigrate` | |
+| 3 | Dry run `FindTestClassesToMigrate`, unblock, re-run | **Done**: 3/13 → 13/13 "migrates" in 2 dry runs, 1 hand edit |
 | 4 | Run the Migration Recipes, unassisted | |
-| 5 | Unblock skipped classes (if any), re-run | |
+| 5 | Unblock skipped classes (if any), re-run | **Folded into step 3** (the guide's dry-run loop) |
 | 6 | Configure the test layers (Playwright + Browserless) | |
 | 7 | Resolve the Migration Markers, class by class | |
 | 8 | `UnifiedStyleTest` (ArchUnit style rules) | |
@@ -133,3 +133,33 @@ alpha4 needs Vaadin 25.3, as alpha3 did. The user approved this with the plan.
 **How it went:** a non-event, as in alpha3. Mise's ITs use `MessageInputElement.get(page)` / `MessageListElement.get(page)` and raw `locator("#id")`, so 2.x's stricter lookups don't affect them. The 2.2.1 "one extra browser call per idle wait" (alpha4 release notes) didn't show in the wall time: 1:21 before, 1:23 after.
 
 **This commit is the baseline** the Migration Recipes run against.
+
+---
+
+## Step 3: Dry run with `FindTestClassesToMigrate` (2026-11-23)
+
+**The documented command has the wrong version.** The alpha4-tagged `docs/migrating-from-dramafinder.md` and `migrating-from-browserless.md` still give `unified-test-rewrite:0.1.0-alpha3`. alpha3 had the same off-by-one problem (F1), and the live site does say alpha4 (G2). The `FindTestClassesToMigrate` snippet uses `<version>`. I used alpha4 with the pinned plugin 6.46.1:
+
+```bash
+./mvnw -U org.openrewrite.maven:rewrite-maven-plugin:6.46.1:dryRun \
+  -Drewrite.recipeArtifactCoordinates=org.vaadin.addons:unified-test-rewrite:0.1.0-alpha4 \
+  -Drewrite.activeRecipes=org.vaadin.addons.unified.rewrite.FindTestClassesToMigrate \
+  -Drewrite.exportDatatables=true
+```
+
+**First pass (10 s):** `target/rewrite/datatables/<ts>/…FindTestClassesToMigrate$TestClasses.csv` lists all 13 UI test classes.
+
+| Status | Classes | Reason |
+|---|---|---|
+| migrates | `PlanViewBrowserlessTest`, `ManualExamplesReportsIT`, `ManualExamplesStopIT` (the last two don't extend `MisePlaywrightIT`) | |
+| skipped | the 10 other ITs | `uses screenshotOnFailure of MisePlaywrightIT, which uses the test base` |
+
+That reason is exact: the `@RegisterExtension TestWatcher` reads `page` to take a screenshot. The release notes say an extension that reads `page` can't be converted. Nothing else in the base class blocked migration: not the annotations, `@LocalServerPort port`, `getUrl()`, the autowired `chatModel` or the `@BeforeEach`.
+
+**Fix:** I deleted the screenshot `TestWatcher` from `MisePlaywrightIT`. Unified writes its own failure evidence (a screenshot + `<test>.view.txt` + `user-steps.txt`) under `target/surefire-reports/unified-evidence/`. No CI config referenced `target/playwright-screenshots/`.
+
+**Second pass:** **13/13 migrate.**
+
+**Deviation from the plan:** the plan had step 4 run the recipe on the untouched suite. The guide's documented workflow is to dry-run, fix and re-run until nothing is skipped, and the dry run had already answered what step 4 was meant to measure. So I followed the guide, and step 5 ("unblock and re-run") is folded in here.
+
+**How it went (about 5 minutes):** this is where alpha4 improves most on alpha3. alpha3's recipe skipped 11 of 12 ITs without a word. Getting to 12/12 took two elimination passes, each comparing converted and skipped classes, plus hand-moving the annotations, `getUrl()`, `port` and `chatModel` out of the base class (alpha3 log, step 5). alpha4 named the one real blocker on the first pass, in a CSV, and handled everything else itself (still to confirm in step 4).
