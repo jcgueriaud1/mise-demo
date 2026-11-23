@@ -348,3 +348,28 @@ Most markers here were `waitForFunction(..)` / `evaluate(..)` JavaScript on comp
 | `ChatDockIT` | 1/3 (`.ai-working`) | 1 (`@RequiresBrowser`, CSS) | 1 (scroll JS) |
 
 Two runs in a row: **Browserless 4 ✓ + 2 skipped, Playwright 6 ✓**. alpha3 ran `ChatBusyStopIT` on Browserless too, but needed its own `UnifiedMessageInput` / `UnifiedMessageList` Wrappers and `tryUnwrap` branches for the dock (F26, F27). Here the shipped Wrappers and `@RequiresBrowser` cover it without either.
+
+### 7f: PlanViewIT (47 markers → 0)
+
+| Marker(s) | Outcome |
+|---|---|
+| `hasTitle("Mise — Plan")` | **Resolved**: `assertThat(page).hasTitle(..)` |
+| `was getByTestId("kpi-card-…")`: no view sets it (4) | **Resolved**: the test id is passed to the `KpiCard` constructor, a project component with no Wrapper, so `UnifiedContainer` stays; markers deleted |
+| `getByTestId("meal-row")).hasCount(7)` | **Resolved**: `UnifiedDiv.withTestId("meal-row")` + `hasCount(7)` |
+| `getByTestId("cost-by-category-panel").getByText("COST BY CATEGORY")` | **Resolved**: `panel.find(UnifiedParagraph.class).withText(..)` |
+| dock-scoped `MessageInputElement` + `typeAndSubmit` + `focus()` (4 tests, about 16 markers) | **Resolved**: a `sendInChatDock(page, prompt)` User Task (`page.step("Ask the chat: …", ..)`) with `UnifiedMessageInput.send` + `element().focus()` |
+| `new MessageListElement(getByTestId("chat-message-list")).assertMessageCount(2)` | **Resolved**: `dock.find(UnifiedMessageList.class)` + `hasMessageCount(2)` |
+| `getByTestId("chat-last-ai-message")).containsText(reply)` | **Resolved**: `UnifiedDiv.withTestId(..)` + `hasTextContaining` |
+| `getByTestId("meal-action-pin")).hasCount(7)` / `locator("[data-pin-date]").first()` | **Resolved**: `UnifiedButton.withTestId("meal-action-pin")` + `hasCount(7)`; for the date: `.withAttribute("data-pin-date", monday)` (stronger than "the first one") |
+| `locator("[data-meal-date='…'] [data-testid='meal-status-edited-pill']")` | **Resolved**: `mealRow(page, date).find(UnifiedSpan.class).withTestId("meal-status-edited-pill")`, with the row found by `withAttribute("data-meal-date", ..)` |
+| `was locator("#mise-meal-undo-…" / "#mise-meal-why-…")`: ids built at runtime (5) + `getByTestId("meal-action-undo").first()` | **Resolved**: `UnifiedButton.withAccessibleName("Undo Thursday")` / `("Why Friday")`, the buttons' `aria-label`s |
+| `locator("#mise-meal-undo-monday")).not().isVisible()` | **Resolved**: `assertThat(undoButton(page, "Monday").visible()).doesNotExist()`, the skill's "gone from the user's view" form |
+| `getByText("Undo applied" / "Cannot undo — meal is pinned")).isVisible()` | **Resolved**: `assertThat(page.find(UnifiedNotification.class).withText(..)).exists()` |
+| `locator("vaadin-message").first()).containsText("why did you change Friday?")` | **Resolved**: `hasMessageCount(2)`, then AssertJ on `getMessageTexts().get(0)` (G10) |
+
+Also:
+- `page.navigate("plan")` used as a reload is now `page.reload()`.
+- The persistence check now waits for the rows (`page.step(.., waitUntil)`), as in 7b.
+- `mealEditRowPersistedAfterAiSwap` is service-level, so it dropped its unused `page`.
+
+All 19 tests run everywhere. **Browserless 18 ✓ + 1 plain JUnit, Playwright 18 ✓ + 1**, green on the first run. alpha3's 7f needed its custom chat Wrappers and kept the title check in Playwright.
