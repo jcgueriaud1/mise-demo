@@ -16,7 +16,7 @@ Issues found along the way: [`findings.md`](findings.md)
 | 5 | Unblock skipped classes (if any), re-run | **Folded into step 3** (the guide's dry-run loop) |
 | 6 | Configure the test layers (Playwright + Browserless) | **Done**: BL 10 ✓ + 64 skipped, PW 74 ✓, 1 app bug fixed |
 | 7 | Resolve the Migration Markers, class by class | **Done**: 228 → 9 (live-LLM ITs, open); BL 70 ✓ + 2 skipped, PW 72 ✓ |
-| 8 | `UnifiedStyleTest` (ArchUnit style rules) | |
+| 8 | `UnifiedStyleTest` (ArchUnit style rules) | **Done**: green; only the live-LLM ITs excluded |
 | 9 | Try alpha4's new tooling on the migrated suite | |
 | 10 | Docs, skills, memory | |
 | 11 | Full verification + comparison with alpha3 | |
@@ -462,3 +462,19 @@ The failsafe count is 74. The 2 not in the Unified summary are the repository-le
 - `hasTitle` (F21)
 - `hasColumn` (F22)
 - `UnifiedDiv.click()` (F23)
+
+---
+
+## Step 8: Style rules (2026-11-23)
+
+**Changes:**
+- `pom.xml`: `unified-test-archunit` (test scope, version from the BOM).
+- `src/test/java/com/example/mise/UnifiedStyleTest.java`: `UnifiedStyleRules.ALL` over `com.example.mise`, the skill's snippet.
+
+**First run:** 5 violations, **all in the two unconverted live-LLM ITs**: 4 × "has no `@DisplayName`" and 1 × "waits with `Thread.sleep(..)`" (`ManualExamplesReportsIT.pollForAnyPref`). The 11 classes migrated in step 7 passed on the first run, because I added `@DisplayName` and given/when/then while resolving their markers. The rules were also fine with `ChatDockIT`'s Escape Hatch, which uses Playwright under `@RequiresTestingTool(PLAYWRIGHT)` and `getCssValue` under `@RequiresBrowser`.
+
+**Fix:** the test excludes `ManualExamples*` with a comment saying when to drop the filter (once they're migrated against a live model). It's the same exclusion alpha3 made.
+
+**Result:** `./mvnw test -Dtest=UnifiedStyleTest`: **1 ✓**.
+
+**How it went (about 5 minutes):** in alpha3 this step was a separate pass that added `@DisplayName` and given/when/then to every migrated test. Writing to the skill's "Shape of a test" while resolving markers made step 8 a check rather than a rewrite. The rule messages are specific (`file:line`, what to add) and need no lookup.

@@ -100,6 +100,12 @@
             <artifactId>unified-test-spring</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- UnifiedStyleRules (ArchUnit): checked by UnifiedStyleTest in the unit layer. -->
+        <dependency>
+            <groupId>org.vaadin.addons</groupId>
+            <artifactId>unified-test-archunit</artifactId>
+            <scope>test</scope>
+        </dependency>
 
         <!-- Persistence: Spring Data JPA + H2 (file mode, see application.properties) -->
         <dependency>
