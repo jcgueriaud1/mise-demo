@@ -15,7 +15,7 @@ Issues found along the way: [`findings.md`](findings.md)
 | 4 | Run the Migration Recipes | **Done**: 13/13 converted in one run, 228 markers, PW 74 ✓ with no hand edits |
 | 5 | Unblock skipped classes (if any), re-run | **Folded into step 3** (the guide's dry-run loop) |
 | 6 | Configure the test layers (Playwright + Browserless) | **Done**: BL 10 ✓ + 64 skipped, PW 74 ✓, 1 app bug fixed |
-| 7 | Resolve the Migration Markers, class by class | |
+| 7 | Resolve the Migration Markers, class by class | **Done**: 228 → 9 (live-LLM ITs, open); BL 70 ✓ + 2 skipped, PW 72 ✓ |
 | 8 | `UnifiedStyleTest` (ArchUnit style rules) | |
 | 9 | Try alpha4's new tooling on the migrated suite | |
 | 10 | Docs, skills, memory | |
@@ -419,3 +419,46 @@ All 12 tests run everywhere. **Browserless 12 ✓, Playwright 12 ✓.** The old 
 That is alpha3's F24 (Browserless lets a test do what a user can't, because it has no CSS), caught on the first run, not by reasoning. The overlay's calendar has no Wrapper (G11), so the pick now sets the picker's `value` property through `element().setProperty(..)`. It's what the old JavaScript did, and it works on both tools. A `page.step("Pick 2026-11-11 in the week picker", ..)` keeps it readable.
 
 All 13 tests run everywhere. **Browserless 13 ✓, Playwright 13 ✓.**
+
+### 7i: PlanViewBrowserlessTest (2 markers → 0); ManualExamples* (9 markers, left open)
+
+**`PlanViewBrowserlessTest`.** `BrowserlessEscapeHatch.$(Button.class).id("mise-meal-undo-friday")` + `test(undoBtn).click()` became `page.find(UnifiedButton.class).withAccessibleName("Undo Friday").click()`, followed by a wait for the "Undo applied" notification before the repository checks. With `@RequiresTestingTool(BROWSERLESS)` dropped, it runs on both tools:
+
+```bash
+./mvnw test -Dtest=PlanViewBrowserlessTest                                  # 1 ✓ (Browserless)
+./mvnw test -Dtest=PlanViewBrowserlessTest -Dvaadin.testing.tool=playwright # 1 ✓
+```
+
+The class name is now historical: it is the surefire-layer smoke test, Browserless by default.
+
+**`ManualExamplesReportsIT` / `ManualExamplesStopIT`: left open, 9 markers.** These are the live-LLM release-gate ITs (`@Tag("manual-example")`, `-Pmanual-verify`). Their markers follow the dock-scoped chat input and `.ai-working` patterns already proven in 7e, but there's no LLM endpoint here to run them. Converting a release gate without running it could break it silently, so I left them as the recipe wrote them, as alpha3 did. Doc cleanup only: their javadoc and `OnboardingRedirectIT`'s still described the deleted `MisePlaywrightIT` / DramaFinder `setupTest()` lifecycle, and the recipe leaves comments as they are. I rewrote those passages and removed the now-unused `AbstractBasePlaywrightIT` imports.
+
+### Step 7 summary
+
+Full run, `./mvnw -Pit verify` (61 s):
+
+| Phase | Result |
+|---|---|
+| surefire | **193 ✓** |
+| it-browserless | **70 ✓**, 2 skipped (`ChatDockIT`: CSS `@RequiresBrowser` + scroll JS) |
+| it-playwright | **72 ✓** |
+
+The failsafe count is 74. The 2 not in the Unified summary are the repository-level tests that no longer take a page.
+
+| | After recipe (step 4) | After step 7 |
+|---|---|---|
+| Migration Markers | 228 | **9** (both live-LLM ITs, unverifiable here) |
+| `// Escape Hatch kept` | 0 | **2** statements, 1 test (scroll-position JavaScript) |
+| Tests pinned to Playwright (`@RequiresTestingTool(PLAYWRIGHT)`) | 68 | **1** (+4 live-LLM, unconverted) |
+| Tests needing a browser (`@RequiresBrowser`) | 0 | **1** (computed CSS) |
+| UI tests runnable on Browserless | 10 | **70** |
+| Project-written Wrappers | 0 | **0** |
+| App bugs found | 0 | **1** (step 6, `OnboardingView`) |
+
+"Compared with Browserless" on the full run: *70 scenarios ran on both Testing Tools: 0 end differently, 1 takes different User Steps.* The one is `ShoppingViewIT`'s "Already have" test. It clicks the first row's button, which was garlic on Playwright and carrot on Browserless. The cause isn't the tools: `PlanService.generateActivePlan` shuffles recipes, so each run gets a different list. The comparison exposed nondeterministic test data that a pass/fail report never would. I left it, since the test is meant to work for any row.
+
+**How it went (about 2 h 15 min, the bulk of the migration).** Every class went green on both tools on the first or second run. The second run was only needed for the date picker (7h), and the cross-tool comparison explained that failure. The time went into reading views to choose good lookups (accessible names over ids), not into fighting the API. Four alpha4 additions removed whole categories of alpha3 work:
+- the shipped chat Wrappers (F7): alpha3 wrote two Wrappers plus two Browserless implementations
+- `hasTitle` (F21)
+- `hasColumn` (F22)
+- `UnifiedDiv.click()` (F23)

@@ -28,7 +28,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.test.context.ActiveProfiles;
-import org.vaadin.addons.dramafinder.AbstractBasePlaywrightIT;
 import org.vaadin.addons.dramafinder.element.MessageInputElement;
 
 import java.math.BigDecimal;
@@ -45,8 +44,8 @@ import java.util.stream.Collectors;
  * harness — so unlike the other 13 examples (see {@code ManualExamplesAIIT}) they can only be verified
  * end-to-end through the <b>real browser chat dock against the live model</b>.
  *
- * <p>Unlike {@link MisePlaywrightIT} (which forces {@code @ActiveProfiles("it")} + a stub ChatModel),
- * this extends {@link AbstractBasePlaywrightIT} directly under {@code @ActiveProfiles("manual")} so the
+ * <p>Unlike the other UI ITs (which use {@code @ActiveProfiles("it")} + a stub ChatModel),
+ * this runs under {@code @ActiveProfiles("manual")} so the
  * real {@code OpenAiChatModel} + production Reports controllers are wired (see
  * {@code application-manual.properties}). Tagged {@code manual-example} → runs only under the opt-in
  * {@code -Pmanual-verify} profile.

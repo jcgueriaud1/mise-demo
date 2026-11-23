@@ -27,16 +27,9 @@ import static com.vaadin.testing.unified.assertion.UnifiedAssertions.assertThat;
  * BR-01: If a {@link Household} row already exists, navigating to {@code /welcome} must
  * forward to {@code /plan} without rendering the onboarding chat panel.
  *
- * <p>Lifecycle design: this class overrides {@code setupTest()} — the {@code @BeforeEach}
- * method from {@link org.vaadin.addons.dramafinder.AbstractBasePlaywrightIT} that creates the
- * browser page and navigates. In JUnit 5, a child method with the same name hides the parent's
- * {@code @BeforeEach}, so {@code super.setupTest()} must be called explicitly to perform the
- * browser navigation. The household is seeded first, so the {@code BeforeEnterObserver} in
- * {@link com.example.mise.ui.onboarding.OnboardingView} finds an existing row and fires
- * the redirect before the page renders.
- *
- * <p>The sibling {@code resetChatModelBetweenTests()} from {@link MisePlaywrightIT} has a
- * different method name so it is not hidden — it still runs as a separate {@code @BeforeEach}.
+ * <p>Lifecycle: {@code seedHousehold()} runs before the test navigates, so the
+ * {@code BeforeEnterObserver} in {@link com.example.mise.ui.onboarding.OnboardingView} finds an
+ * existing row and fires the redirect before the page renders.
  *
  * <p>Cleanup: {@code @AfterEach} deletes all household rows so the shared in-memory H2 and
  * Spring context stay clean for other ITs. {@code @DirtiesContext} is not needed.

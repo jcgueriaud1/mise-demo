@@ -23,7 +23,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.test.context.ActiveProfiles;
-import org.vaadin.addons.dramafinder.AbstractBasePlaywrightIT;
 import org.vaadin.addons.dramafinder.element.MessageInputElement;
 
 import java.math.BigDecimal;
@@ -35,8 +34,8 @@ import java.util.List;
  * <p>The busy note and idle "stop" are covered deterministically by {@link ChatBusyStopIT}
  * (stub model). Cancelling a <i>real</i> in-flight turn, however, depends on the production
  * provider/orchestrator path streaming over a live connection — which only exists with the real
- * {@code OpenAiChatModel}. Like {@link ManualExamplesReportsIT}, this extends
- * {@link AbstractBasePlaywrightIT} under {@code @ActiveProfiles("manual")} and is tagged
+ * {@code OpenAiChatModel}. Like {@link ManualExamplesReportsIT}, this runs
+ * under {@code @ActiveProfiles("manual")} and is tagged
  * {@code manual-example} → runs only under the opt-in {@code -Pmanual-verify} profile.
  *
  * <p><b>Best-effort by nature.</b> The turn must still be streaming when "stop" lands, so the

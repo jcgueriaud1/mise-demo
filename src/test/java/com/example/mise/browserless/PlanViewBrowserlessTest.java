@@ -11,15 +11,14 @@ import com.example.mise.domain.plan.PlanRepository;
 import com.example.mise.domain.plan.PlanService;
 import com.example.mise.it.support.TestAiConfig;
 import com.example.mise.ui.plan.PlanView;
-import com.vaadin.flow.component.button.Button;
-import com.vaadin.testing.unified.RequiresTestingTool;
-import com.vaadin.testing.unified.TestingTool;
 import com.vaadin.testing.unified.UnifiedPage;
-import com.vaadin.testing.unified.browserless.BrowserlessEscapeHatch;
+import com.vaadin.testing.unified.component.UnifiedButton;
+import com.vaadin.testing.unified.component.UnifiedNotification;
 import com.vaadin.testing.unified.spring.UnifiedSpringBootTest;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
@@ -28,6 +27,8 @@ import org.springframework.test.context.ActiveProfiles;
 import java.math.BigDecimal;
 import java.time.DayOfWeek;
 import java.util.List;
+
+import static com.vaadin.testing.unified.assertion.UnifiedAssertions.assertThat;
 
 /**
  * Browserless example for /plan — same component tree as production, no Chromium,
@@ -87,14 +88,13 @@ class PlanViewBrowserlessTest {
     /**
      * UC-004 row-undo click → MealEdit revert + new audit row. Same assertion as
      * {@code PlanViewIT.clickingRowUndoRestoresPreviousRecipeAndWritesUndoAuditRow}
-     * but in-process, no browser. Acts as a smoke check that the Browserless
-     * harness is wired and the affordance is findable by stable id.
+     * but run by Surefire, in-process on Browserless by default. Acts as a smoke check
+     * that the Unified harness is wired in the fast unit layer.
      */
     @Test
-    @RequiresTestingTool(TestingTool.BROWSERLESS)
+    @DisplayName("Undo on a row restores the previous recipe and writes an undo audit row")
     void rowUndoButtonRestoresPreviousRecipeAndWritesAuditRow(UnifiedPage page) {
-        BrowserlessEscapeHatch browserless = BrowserlessEscapeHatch.of(page);
-        // Pre-seed an AI swap on Friday so the row carries edit history.
+        // given: an AI swap on Friday so the row carries edit history
         var household = householdService.findHousehold().orElseThrow();
         var plan = planService.findActivePlan(household.getId()).orElseThrow();
         var friday = planService.findMeals(plan.getId()).stream()
@@ -106,14 +106,13 @@ class PlanViewBrowserlessTest {
                 .filter(id -> !id.equals(originalRecipe))
                 .findFirst().orElseThrow();
         planService.swapMeal(friday.getId(), swapTarget, "Browserless setup");
-
         page.navigate(PlanView.class);
 
-        // TODO unified: Browserless Escape Hatch: $(Button.class).id("mise-meal-undo-friday")
-        var undoBtn = browserless.$(Button.class).id("mise-meal-undo-friday");
-        // TODO unified: Component Reference: test(undoBtn).click(): replace it with a locator that finds the same component
-        browserless.test(undoBtn).click();
+        // when
+        page.find(UnifiedButton.class).withAccessibleName("Undo Friday").click();
 
+        // then
+        assertThat(page.find(UnifiedNotification.class).withText("Undo applied")).exists();
         var fridayAfter = mealRepository.findById(friday.getId()).orElseThrow();
         var fridayEdits = mealEditRepository.findByMealIdOrderByChangedAtDesc(friday.getId());
 
