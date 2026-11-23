@@ -18,7 +18,7 @@ Issues found along the way: [`findings.md`](findings.md)
 | 7 | Resolve the Migration Markers, class by class | **Done**: 228 → 9 (live-LLM ITs, open); BL 70 ✓ + 2 skipped, PW 72 ✓ |
 | 8 | `UnifiedStyleTest` (ArchUnit style rules) | **Done**: green; only the live-LLM ITs excluded |
 | 9 | Try alpha4's new tooling on the migrated suite | **Done**: 1 regression test added; 2 findings |
-| 10 | Docs, skills, memory | |
+| 10 | Docs, skills, memory | **Done**; `spec/architecture.md` pending approval |
 | 11 | Full verification + comparison with alpha3 | |
 
 Convention: **one commit per step**, message `unified-testing-alpha4: step N, <what>`. Each commit appends its entry below and any new issue to `findings.md`.
@@ -522,3 +522,22 @@ The view also lists only components with a Wrapper type, so the week badge (`Spa
 In 10 s it changed exactly one line, the string in the `prevWeek(page)` helper, and the data table recorded `withAccessibleName, Previous week → Previous Week`. The class then passed 13/13 on both tools. Then I reverted both changes. A bigger rename ("Go to previous week") gives no suggestion; the new label is listed first under `Nearby`, and the recipe leaves it alone. That's the documented behaviour, but the threshold isn't stated (G14). The `Did you mean` line appears in `summary.md` and `user-steps.json` but not in `user-steps.txt`.
 
 **How it went (about 25 minutes):** each feature worked as described on a real suite. `hasNoErrors()` and `ApplyDidYouMean` are the ones I'd keep using here.
+
+---
+
+## Step 10: Docs, skills, memory (2026-11-23)
+
+| File | Change |
+|---|---|
+| `CLAUDE.md` | Build & Run commands; the "three test layers" now describe the Unit layer (+ `UnifiedStyleTest`) and the **UI IT** layer (Unified UI Tests, run on Browserless then Playwright, `@RequiresBrowser` / `@RequiresTestingTool` for the exceptions, where the reports are, read "Compared with Browserless"); the skills list adds `write-unified-ui-tests` and `resolve-migration-markers` and marks `vaadin-playwright-test` legacy. The recipe's own `## Unified UI Tests` pointer section (step 4) stays as written. |
+| `README.md` | "Integration (browser) tests": no manual `playwright install` (alpha4 downloads Chromium's headless shell itself), both tools, where the reports are; the test-layers line. `-Pdebug-ui` (headed) still works: its `headless=false` feeds `vaadin.testing.playwright.headless`. |
+| `.claude/skills/implement-uc/SKILL.md` | Phase 1.5 now generates Unified UI Tests: the skill to follow, the class annotations to copy (one Spring context), chat/reload/persistence patterns, which examples to mirror, verify on both tools + `UnifiedStyleTest`; "Browserless vs Playwright" rewritten as "every test runs on both; narrow only with `@RequiresBrowser` / `@RequiresTestingTool`". |
+| `.claude/skills/pre-release/SKILL.md` | The `-Pit` line: both executions, read the comparison. |
+| `.claude/skills/vaadin-playwright-test/SKILL.md` | A "Legacy in this project" note pointing to `write-unified-ui-tests`. |
+| `spec/verification.md` §2a | One sentence: the ITs are Unified UI Tests run on Browserless and Playwright (a wording sync, not a structural change). |
+| `.claude/memory/` | New `reference_unified_testing.md` (version, how it runs, where the API reference is, the 5 gotchas found here); the two DramaFinder memories marked legacy; `project_aiit_forkcount_override.md` no longer cites `pom.xml:217`, which was stale before and moved further with this branch's pom changes. |
+| `rewrite.yml` | Removed: a one-time migration config. Step 4 has it for reference, if the `ManualExamples*` ITs are ever re-migrated. |
+
+**Not changed, needs approval:** `spec/architecture.md` (CLAUDE.md guardrail). It still says "Vaadin Flow 25.2", `vaadin-ai-components-flow`, "Vaadin Browserless Test framework (`browserless-test-junit6`) for view tests" and "DramaFinder + Microsoft Playwright … for end-to-end browser tests". The proposed change is in the wrap-up.
+
+**How it went (about 20 minutes):** the recipe's `CLAUDE.md` pointer (F15 fixed) was a good start, but a project's own docs describe its test stack in many places: here 8 files and 2 memories. No recipe could know about them. A grep for `DramaFinder|Playwright|Browserless|MisePlaywrightIT` found them all.

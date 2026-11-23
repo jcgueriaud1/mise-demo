@@ -5,6 +5,8 @@ description: Generate Playwright integration tests for Vaadin 25 views using the
 
 # Vaadin Playwright Test Generator (DramaFinder)
 
+> **Legacy in this project.** Mise's UI tests were migrated to Unified UI Tests (`org.vaadin.addons:unified-test-*`). Write new or changed `*IT.java` tests with `.claude/skills/write-unified-ui-tests/SKILL.md` instead; this skill stays for reference only.
+
 ## Best practices
 
 Always follow the guidelines in [@TESTING.md](TESTING.md) when generating tests. Key rules:

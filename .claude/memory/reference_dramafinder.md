@@ -7,6 +7,8 @@ metadata:
   originSessionId: 4878e101-3f89-431f-ba3c-67e683989ad5
 ---
 
+> **Legacy (2026-11-23):** Mise's UI tests now use Unified UI Tests — see [[reference-unified-testing]]. DramaFinder only arrives transitively, under `unified-test-playwright`.
+
 **DramaFinder** — Playwright utility classes for Vaadin, by parttio (JC Gueriaud).
 
 - Repo: https://github.com/parttio/dramafinder
