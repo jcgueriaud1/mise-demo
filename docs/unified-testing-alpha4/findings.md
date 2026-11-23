@@ -1,6 +1,6 @@
 # Findings: Unified Testing 0.1.0-alpha4 in Mise
 
-Issues found while migrating Mise's Browserless and DramaFinder tests to `org.vaadin.addons:unified-test-*` 0.1.0-alpha4. The process is in [`migration-log.md`](migration-log.md). **Filed upstream:** tracking issue [parttio/unified-testing-tool#519](https://github.com/parttio/unified-testing-tool/issues/519), with sub-issues #508–#518 (2026-11-23). G1 is covered by #366/#374 (closed by documenting it). G9 and G12 are positives, listed in #519.
+Issues found while migrating Mise's Browserless and DramaFinder tests to `org.vaadin.addons:unified-test-*` 0.1.0-alpha4. The process is in [`migration-log.md`](migration-log.md). **Filed upstream:** tracking issue [parttio/unified-testing-tool#519](https://github.com/parttio/unified-testing-tool/issues/519), with sub-issues #508–#518 and #520 (2026-11-23). G1 is covered by #366/#374 (closed by documenting it). G9 and G12 are positives, listed in #519.
 
 Numbering starts at **G1** so these don't clash with the alpha3 findings (F1–F27, on branch `unified-testing-alpha3`). Each entry says how sure it is:
 
@@ -86,7 +86,7 @@ The first version of the picker test passed on Browserless and failed on Playwri
 A label changed from "Previous week" to "Previous Week" gets `Did you mean find(UnifiedButton.class).withAccessibleName("Previous Week")`, and `ApplyDidYouMean` applies it. Changed to "Go to previous week", it gets none, though that button is the first `Nearby`. Not guessing is reasonable, but the guide doesn't say how close a near miss must be. Also, the suggestion is in `summary.md` and `user-steps.json`, while `user-steps.txt`, the file the skill tells you to read, shows only `Expected` and `Found`.
 **Suggestion:** document the threshold, and add the `Did you mean` line to `user-steps.txt`'s failure block.
 
-### G15: The bundled skill and API reference don't mention the evidence settings, so an agent concludes screenshots come only on failure. Verified · docs
+### G15: The bundled skill and API reference don't mention the evidence settings, so an agent concludes screenshots come only on failure. Verified · docs · [#520](https://github.com/parttio/unified-testing-tool/issues/520)
 
 Asked "how do I run the tests with screenshots on Playwright and Browserless?", an agent working from the files shipped with alpha4 answered that there is no option: evidence is written only when a test fails. Wrong. `vaadin.testing.user-steps.snapshots=true` (alpha3, #271) writes a screenshot (browsers) or a component tree (Browserless) after every User Step, and `vaadin.testing.playwright.trace=on|on-failure` keeps `trace.zip`. Both are read by `Settings` / `PlaywrightSession` in the alpha4 jars, and the alpha3 release notes document them. But the agent-facing docs don't:
 - `META-INF/unified/api-reference.md` lists only `page.screenshot(Path)`.
