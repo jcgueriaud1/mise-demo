@@ -585,7 +585,7 @@ For comparison, the DramaFinder baseline (step 2) took 83 s for Playwright alone
 1. **The live-LLM ITs.** `ManualExamplesReportsIT` and `ManualExamplesStopIT` still have 9 Migration Markers. Resolve them with a live endpoint and `-Pmanual-verify`, then drop their filter from `UnifiedStyleTest`.
 2. ~~**`spec/architecture.md`.**~~ Applied after approval (step 10b).
 3. **AIIT.** Run `./mvnw -Pai-it verify` against the live model.
-4. **Upstream.** File G1–G14, or the non-positive ones, against parttio/unified-testing-tool, as was done for alpha3 (#368). Not done: that's an outward-facing action left to the user.
+4. ~~**Upstream.**~~ Filed (asked by the user): tracking issue [#519](https://github.com/parttio/unified-testing-tool/issues/519), with sub-issues #508–#518.
 
 ### Commits
 
