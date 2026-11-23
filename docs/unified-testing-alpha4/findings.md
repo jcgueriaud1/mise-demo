@@ -56,6 +56,11 @@ The release notes say a failed test writes `<test>.view.txt` and that the failur
 
 On the first Browserless run, `OnboardingViewIT` failed with `Expected exactly one message input, found none`. The cause was printed under User Step 1 in `user-steps.txt`: `⚠ server ERROR … CancellableLLMProvider is already in use by another AIOrchestrator`. It came from a view that rebuilds its orchestrator when `beforeEnter` fires again on the same instance, which Browserless does on a same-route `navigate` and a browser hides behind a full page load. Without the log line, "found none" would have meant a debugging session. This is the same class of finding as alpha3's F20, which took longer to diagnose.
 
+### G10: `UnifiedMessageList` has no positional or per-sender check. Verified · minor
+
+The checks are `hasMessageCount`, `hasMessageContaining` (any message), `hasMessageTexts` (all texts, exactly) and `isEmpty`. A chat test usually means "the user's message, then the assistant's reply containing X". Mise's ITs checked `getMessage(1)` and `getMessage(2)` with `containsText(..)`. `hasMessageTexts` needs every full text, including a long seeded greeting, and `hasMessageContaining` loses the order and who said it. So the test waits on `hasMessageCount(3)` and then reads `getMessageTexts().get(i)` once. That works, but the reads leave no `see` line in `user-steps.txt`.
+**Suggestion:** `hasMessage(int index, String containing)` or `hasLastMessageContaining(..)`, and/or a check on `Message.userName()`, like `hasMessageFrom("Mise", containing)`.
+
 ## alpha3 findings re-checked
 
 | alpha3 | Status in alpha4 | Evidence |

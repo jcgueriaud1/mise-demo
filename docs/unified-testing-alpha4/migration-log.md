@@ -279,3 +279,18 @@ The tools used for each marker: the bundled `META-INF/unified/api-reference.md` 
 | `hasURL(".*/plan.*")` | **Resolved**: `assertThat(page).isAt(PlanView.class)` |
 
 All four tests dropped `@RequiresTestingTool(PLAYWRIGHT)`. **Browserless 4 ✓, Playwright 4 ✓.** I also renamed `OnboardingRedirectIT`'s `setupTest()` to `seedHousehold()`, since its "overrides the base class" comment no longer applied. In alpha3 these two classes needed the Escape Hatch kept for the title check (F21).
+
+### 7b: OnboardingViewIT (10 markers → 0)
+
+All 10 markers were `MessageListElement.get(playwright)` with `assertMessageCount(n)` / `getMessage(i)` + `containsText(..)`. alpha3 had to write its own `UnifiedMessageList` Wrapper for this class (F7). alpha4 ships one.
+
+| Marker(s) | Outcome |
+|---|---|
+| `MessageListElement.get(playwright)` (3) | **Resolved**: `page.find(UnifiedMessageList.class)` |
+| `assertMessageCount(n)` (3) | **Resolved**: `assertThat(messages).hasMessageCount(n)` |
+| `assertThat(getMessage(0)).containsText(greeting)` | **Resolved**: `.hasMessageContaining(..)` (one message, so position doesn't matter) |
+| `assertThat(getMessage(1 or 2)).containsText(..)` (3) | **Resolved**: after the retrying `hasMessageCount(3)`, AssertJ on `getMessageTexts().get(i)`. There's no positional retrying check, so these reads don't appear in the User Steps (G10) |
+
+I also changed the persistence check. It read the repository once, right after the UI showed the reply. The response listener stores the turn *after* rendering, so a single read races on Playwright. It's now `page.step("The conversation is stored as onboarding", () -> page.waitUntil(..))`, and `user-steps.txt` shows it as a named step with "… 1 call outside the Unified API (waitUntil)".
+
+All 4 tests run everywhere. **Browserless 4 ✓, Playwright 4 ✓.**
