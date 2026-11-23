@@ -17,7 +17,7 @@ Issues found along the way: [`findings.md`](findings.md)
 | 6 | Configure the test layers (Playwright + Browserless) | **Done**: BL 10 ✓ + 64 skipped, PW 74 ✓, 1 app bug fixed |
 | 7 | Resolve the Migration Markers, class by class | **Done**: 228 → 9 (live-LLM ITs, open); BL 70 ✓ + 2 skipped, PW 72 ✓ |
 | 8 | `UnifiedStyleTest` (ArchUnit style rules) | **Done**: green; only the live-LLM ITs excluded |
-| 9 | Try alpha4's new tooling on the migrated suite | |
+| 9 | Try alpha4's new tooling on the migrated suite | **Done**: 1 regression test added; 2 findings |
 | 10 | Docs, skills, memory | |
 | 11 | Full verification + comparison with alpha3 | |
 
@@ -478,3 +478,47 @@ The failsafe count is 74. The 2 not in the Unified summary are the repository-le
 **Result:** `./mvnw test -Dtest=UnifiedStyleTest`: **1 ✓**.
 
 **How it went (about 5 minutes):** in alpha3 this step was a separate pass that added `@DisplayName` and given/when/then to every migrated test. Writing to the skill's "Shape of a test" while resolving markers made step 8 a check rather than a rewrite. The rule messages are specific (`file:line`, what to add) and need no lookup.
+
+---
+
+## Step 9: alpha4's new tooling on the migrated suite (2026-11-23)
+
+I tried each addition from the alpha4 release notes on the finished suite. Only the regression test below is committed. The rest were throwaway experiments, reverted.
+
+**Server and console lines under the User Step.** In the step 7 full run, no User Step on either tool has a `⚠` line: the app logs no warning or error during the suite. In step 6 the same feature pinpointed the `OnboardingView` bug (G9).
+
+**"Scenarios without a check":** 62 of 74 after the recipe (step 4), **0** after step 7. As a progress signal for marker work it was useful. Each scenario that still ended on an unchecked action was one whose check was still a raw Playwright assertion.
+
+**`assertThat(page).hasNoErrors()`, used as a regression test for the step-6 bug.** It's added to `OnboardingViewIT`: open onboarding twice in the same UI, then `hasNoErrors()`, plus the chat still works. I proved it by temporarily reverting the `OnboardingView` fix:
+- it failed on Browserless with `Expected no error in the application's log or a browser's console, found 1: server ERROR … CancellableLLMProvider is already in use by another AIOrchestrator`
+- so did every other `OnboardingViewIT` test, which all run on Browserless now (in step 6 only 1 of them did)
+
+With the fix restored: **Browserless 5 ✓, Playwright 5 ✓.**
+
+**Findable View (`page.describe()`).** A throwaway test printed it for `/plan` on both tools:
+
+```text
+Findable view of “/plan” on browserless: 12 components
+date picker “Select week” = “2026-11-23”  page.find(UnifiedDatePicker.class).withAccessibleName("Select week")
+button “Previous week” (disabled)       page.find(UnifiedButton.class).withAccessibleName("Previous week")
+button “Pin meal — AI won't swap it”    not unique: 7 alike; this one in container (test id “meal-row”)
+message input                           page.find(UnifiedMessageInput.class)
+```
+
+Useful: each line gives the canonical lookup, and Playwright marks the CSS-hidden picker `(hidden)`, the G11 situation, visible at a glance. Two gaps (G13):
+- Playwright lists an extra `text area “Message”`, the `MessageInput`'s inner field, so the two tools' views differ.
+- The only advice for the 7 pin buttons is "in container (test id “meal-row”)", which all 7 share. The `data-pin-date` attribute that tells them apart isn't suggested.
+
+The view also lists only components with a Wrapper type, so the week badge (`Span`) and the tabs (`Div`s with click listeners) aren't there, though tests click them.
+
+**`ApplyDidYouMean`.** I simulated a label change: the "Previous week" button's `aria-label` became "Previous Week" in `MainLayout`. 8 of 13 `WeekNavigationIT` tests failed on both tools, each with `suggestion: find(UnifiedButton.class).withAccessibleName("Previous Week")` in `user-steps.json`. Then:
+
+```bash
+./mvnw org.openrewrite.maven:rewrite-maven-plugin:6.46.1:run \
+  -Drewrite.recipeArtifactCoordinates=org.vaadin.addons:unified-test-rewrite:0.1.0-alpha4 \
+  -Drewrite.activeRecipes=org.vaadin.addons.unified.rewrite.ApplyDidYouMean -Drewrite.exportDatatables=true
+```
+
+In 10 s it changed exactly one line, the string in the `prevWeek(page)` helper, and the data table recorded `withAccessibleName, Previous week → Previous Week`. The class then passed 13/13 on both tools. Then I reverted both changes. A bigger rename ("Go to previous week") gives no suggestion; the new label is listed first under `Nearby`, and the recipe leaves it alone. That's the documented behaviour, but the threshold isn't stated (G14). The `Did you mean` line appears in `summary.md` and `user-steps.json` but not in `user-steps.txt`.
+
+**How it went (about 25 minutes):** each feature worked as described on a real suite. `hasNoErrors()` and `ApplyDidYouMean` are the ones I'd keep using here.

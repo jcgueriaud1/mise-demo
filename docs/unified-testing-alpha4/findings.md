@@ -70,6 +70,20 @@ Mise's week picker is a `DatePicker` whose text field is hidden by CSS; the badg
 
 The first version of the picker test passed on Browserless and failed on Playwright. The Playwright run's `summary.md` (from `compare-dir`, set up in step 6) gave the two scenarios that "end differently", the step where the runs part, and the Playwright error. alpha3's F24 found the same class of problem by reasoning after the fact. Here it was the first thing the run reported. The two runs in one `mvn verify`, with the comparison, are worth their setup.
 
+### G13: The Findable View differs between tools, and its "not unique" hint can't be acted on. Verified
+
+`page.describe()` on `/plan` (12 components on Browserless, 13 on Playwright):
+- **Not the same on every tool**, as the release notes promise. Playwright also lists `text area “Message”  page.find(UnifiedTextArea.class).withAccessibleName("Message")`, the text area inside `vaadin-message-input`. It isn't a component the app created, and Browserless doesn't list it.
+- **"not unique: 7 alike; this one in container (test id “meal-row”)"** is printed for each of the 7 pin buttons. All 7 rows share that test id, so the hint names nothing that tells them apart. Each button has a distinct `data-pin-date` and `aria-label`-free row context. The test in 7f uses `withAttribute("data-pin-date", ..)`, and the view could suggest that.
+- **Only Wrapper-typed components are listed.** The week badge (`Span`, clicked to open the picker) and the tabs (`Div` with a click listener, clicked with `UnifiedDiv.click()`) are findable and clickable, but not in the view.
+
+**Suggestion:** filter out a component's own internal children on browser tools. When siblings share a container, look for a distinguishing attribute. List plain HTML components that have a click listener.
+
+### G14: When `Did you mean` appears isn't documented, and it's missing from `user-steps.txt`. Verified · minor
+
+A label changed from "Previous week" to "Previous Week" gets `Did you mean find(UnifiedButton.class).withAccessibleName("Previous Week")`, and `ApplyDidYouMean` applies it. Changed to "Go to previous week", it gets none, though that button is the first `Nearby`. Not guessing is reasonable, but the guide doesn't say how close a near miss must be. Also, the suggestion is in `summary.md` and `user-steps.json`, while `user-steps.txt`, the file the skill tells you to read, shows only `Expected` and `Found`.
+**Suggestion:** document the threshold, and add the `Did you mean` line to `user-steps.txt`'s failure block.
+
 ## alpha3 findings re-checked
 
 | alpha3 | Status in alpha4 | Evidence |

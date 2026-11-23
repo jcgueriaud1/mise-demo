@@ -95,6 +95,26 @@ class OnboardingViewIT {
     }
 
     /**
+     * Regression: opening onboarding again in the same UI re-runs {@code beforeEnter} on the
+     * same view instance; it must not build a second orchestrator on the view's one provider
+     * (found by this suite on Browserless, which keeps the UI across navigations).
+     */
+    @Test
+    @DisplayName("Opening onboarding again keeps the chat working and logs no error")
+    void reopeningOnboardingKeepsTheChatWorking(UnifiedPage page) {
+        // given
+        page.navigate(OnboardingView.class);
+
+        // when
+        page.navigate(OnboardingView.class);
+
+        // then
+        assertThat(page).hasNoErrors();
+        assertThat(page.find(UnifiedMessageList.class)).hasMessageCount(1);
+        assertThat(page.find(UnifiedMessageInput.class)).isVisible();
+    }
+
+    /**
      * BR-07: messages persisted after a round-trip carry {@code viewContext = ONBOARDING}.
      *
      * <p>Queues a stub reply, submits user input (triggering {@code onResponseComplete}
