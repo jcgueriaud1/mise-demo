@@ -7,7 +7,9 @@ metadata:
   originSessionId: 82ca33d1-3d0b-4549-bfc3-e449acd0c634
 ---
 
-Vaadin AI components 25.2.0-alpha5 (`com.vaadin:vaadin-ai-components-flow`) are compiled against **Spring AI 2.0.0-M4** specifically. The pom declares direct deps on `spring-ai-client-chat:2.0.0-M4` and `spring-ai-model:2.0.0-M4`.
+**Current (2026-11-23): Vaadin 25.3.5 ↔ Spring AI 2.0.1.** From 25.3 the AI components live in `com.vaadin:vaadin-ai-core-flow` (+ `vaadin-ai-extensions-flow`), pulled in transitively by `vaadin`; `vaadin-ai-components-flow` stops at 25.2.x. Check `vaadin-ai-core-flow`'s POM for the Spring AI version on every Vaadin bump. 25.3 also changed `AIController.onRequest()` / `onResponse(Throwable)` to take `RequestListener.RequestEvent` / `ResponseListener.ResponseEvent`.
+
+History: Vaadin AI components 25.2.0-alpha5 (`com.vaadin:vaadin-ai-components-flow`) are compiled against **Spring AI 2.0.0-M4** specifically. The pom declares direct deps on `spring-ai-client-chat:2.0.0-M4` and `spring-ai-model:2.0.0-M4`.
 
 Newer milestones (2.0.0-M5, M6) renamed `MessageChatMemoryAdvisor$Builder.conversationId(String)` and the call inside Vaadin's `SpringAILLMProvider.<init>` (line 109) fails at bean creation time with:
 

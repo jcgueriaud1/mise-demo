@@ -67,8 +67,8 @@ Freshness (1b) only proves the manual was recently rebuilt — not that it docum
 
 1. **Pre-flight the live endpoint.** Confirm `application-local.properties` exists at the project root and points at the **llama.cpp endpoint chosen in Check 0** (the test baseline, with `/v1`) — AIIT drives the **live LLM** and onboarding depends on it. If it is missing, emit a **Warning** and **skip** the AIIT layer rather than letting it hang (~30 min on a stale-default endpoint). When present, surface the configured `spring.ai.openai.base-url` (host only — never the key) so the reader knows what it will hit.
 2. Run each layer, capturing the exit code and the failure summary verbatim. **Do not pass `-q`** — it suppresses the Surefire/Failsafe `Tests run:` summary lines. If a run was already done quietly, recover the counts from `target/surefire-reports/*.txt` and `target/failsafe-reports/*.txt` rather than inferring pass from the exit code alone.
-   - `./mvnw test` — unit + browserless.
-   - `./mvnw -Pit verify` — Playwright IT. Note: the first run rebuilds the Vaadin bundle (3–5 min).
+   - `./mvnw test` — unit tests + `UnifiedStyleTest`.
+   - `./mvnw -Pit verify` — UI ITs (Unified UI Tests) on Browserless, then Playwright; both executions must pass. Read the Playwright `summary.md`'s "Compared with Browserless". Note: the first run rebuilds the Vaadin bundle (3–5 min).
    - `./mvnw -Pai-it verify` — AI Tool IT (live LLM, 2-fork parallel). Skipped per step 1 if no endpoint.
 3. Report each layer's result with its `Tests run / Failures / Errors / Skipped` counts. Any failing layer is an **Error**.
 

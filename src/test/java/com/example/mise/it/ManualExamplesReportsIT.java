@@ -13,17 +13,21 @@ import com.example.mise.domain.plan.PlanService;
 import com.example.mise.domain.preferences.ViewPreference;
 import com.example.mise.domain.preferences.ViewPreferenceRepository;
 import com.example.mise.domain.preferences.ViewPreferenceService;
+import com.example.mise.ui.reports.ReportsView;
+
+import com.microsoft.playwright.Page;
+import com.vaadin.testing.unified.RequiresTestingTool;
+import com.vaadin.testing.unified.TestingTool;
+import com.vaadin.testing.unified.UnifiedPage;
+import com.vaadin.testing.unified.spring.UnifiedSpringBootTest;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.test.context.ActiveProfiles;
-import org.vaadin.addons.dramafinder.AbstractBasePlaywrightIT;
 import org.vaadin.addons.dramafinder.element.MessageInputElement;
 
 import java.math.BigDecimal;
@@ -40,8 +44,8 @@ import java.util.stream.Collectors;
  * harness — so unlike the other 13 examples (see {@code ManualExamplesAIIT}) they can only be verified
  * end-to-end through the <b>real browser chat dock against the live model</b>.
  *
- * <p>Unlike {@link MisePlaywrightIT} (which forces {@code @ActiveProfiles("it")} + a stub ChatModel),
- * this extends {@link AbstractBasePlaywrightIT} directly under {@code @ActiveProfiles("manual")} so the
+ * <p>Unlike the other UI ITs (which use {@code @ActiveProfiles("it")} + a stub ChatModel),
+ * this runs under {@code @ActiveProfiles("manual")} so the
  * real {@code OpenAiChatModel} + production Reports controllers are wired (see
  * {@code application-manual.properties}). Tagged {@code manual-example} → runs only under the opt-in
  * {@code -Pmanual-verify} profile.
@@ -53,10 +57,10 @@ import java.util.stream.Collectors;
  * column alias / chart wording and to streaming timing, and it proves the live model actually reshaped
  * the widget rather than just replying in prose.
  */
-@SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT)
+@UnifiedSpringBootTest
 @ActiveProfiles("manual")
 @Tag("manual-example")
-class ManualExamplesReportsIT extends AbstractBasePlaywrightIT {
+class ManualExamplesReportsIT {
 
     /**
      * How long to wait for the live model's turn (tool calls + reshape persist) to land. These
@@ -85,17 +89,6 @@ class ManualExamplesReportsIT extends AbstractBasePlaywrightIT {
 
     private Household household;
 
-    @Override
-    public String getUrl() {
-        return "http://localhost:" + port;
-    }
-
-    @Override
-    public String getView() {
-        return "/reports";
-    }
-
-    @Override
     @BeforeEach
     public void setupTest() throws Exception {
         Household h = new Household();
@@ -109,9 +102,7 @@ class ManualExamplesReportsIT extends AbstractBasePlaywrightIT {
 
         // History so the trend/leaderboard have real data to reshape; active week for "current".
         planService.seedHistory(household, 4, recipeCatalog);
-        planService.generateActivePlan(household, recipeCatalog);
-
-        super.setupTest(); // navigates to getUrl() + getView() == /reports
+        planService.generateActivePlan(household, recipeCatalog); // navigates to getUrl() + getView() == /reports
     }
 
     @AfterEach
@@ -130,11 +121,13 @@ class ManualExamplesReportsIT extends AbstractBasePlaywrightIT {
 
     // ── #13 — "In the leaderboard, rank by kcal per euro." ─────────────────────
     @Test
-    void leaderboardRankByKcalPerEuro_reshapesViaChat() throws InterruptedException {
+    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    void leaderboardRankByKcalPerEuro_reshapesViaChat(UnifiedPage page) throws InterruptedException {
+        page.navigate(ReportsView.class);
         Assertions.assertThat(pref("leaderboard"))
                 .as("Precondition: the leaderboard must start with no saved ViewPreference").isFalse();
 
-        sendToDock("In the leaderboard, rank by kcal per euro.");
+        sendToDock(page, "In the leaderboard, rank by kcal per euro.");
 
         Assertions.assertThat(pollForPref("leaderboard"))
                 .as("Manual example #13: the live model must reshape the leaderboard (update_grid_data), "
@@ -149,11 +142,13 @@ class ManualExamplesReportsIT extends AbstractBasePlaywrightIT {
     // leaderboard query and inspect its result shape (week-per-row + fish/meat/veg/chicken + a
     // kcal-per-euro value), tolerating the model's exact alias wording.
     @Test
-    void leaderboardWeeklyMealTypePivot_reshapesViaChat() throws InterruptedException {
+    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    void leaderboardWeeklyMealTypePivot_reshapesViaChat(UnifiedPage page) throws InterruptedException {
+        page.navigate(ReportsView.class);
         Assertions.assertThat(pref("leaderboard"))
                 .as("Precondition: the leaderboard must start with no saved ViewPreference").isFalse();
 
-        sendToDock("For the leaderboard, show one row per week with columns for fish, meat, veg "
+        sendToDock(page, "For the leaderboard, show one row per week with columns for fish, meat, veg "
                 + "and chicken meals, plus the average kcal per euro that week.");
 
         Assertions.assertThat(pollForPref("leaderboard"))
@@ -191,11 +186,13 @@ class ManualExamplesReportsIT extends AbstractBasePlaywrightIT {
     // steering the reporting schema notes to H2's FORMATDATETIME(...) plus a self-correcting error
     // hint in MiseDatabaseProvider (see ReportSnapshotService.SCHEMA_NOTES).
     @Test
-    void chartVegetarianByMonth_reshapesViaChat() throws InterruptedException {
+    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    void chartVegetarianByMonth_reshapesViaChat(UnifiedPage page) throws InterruptedException {
+        page.navigate(ReportsView.class);
         Assertions.assertThat(pref("trendChart") || pref("categoryChart"))
                 .as("Precondition: charts must start with no saved ViewPreference").isFalse();
 
-        sendToDock("Show me a chart of how often I cook vegetarian dinners by month.");
+        sendToDock(page, "Show me a chart of how often I cook vegetarian dinners by month.");
 
         // Accept either chart widget being repointed — the manual documents the trend chart, but the
         // model legitimately may target the category chart; either proves the NL-driven repoint worked.
@@ -208,8 +205,11 @@ class ManualExamplesReportsIT extends AbstractBasePlaywrightIT {
 
     // ── helpers ────────────────────────────────────────────────────────────────
 
-    private void sendToDock(String prompt) {
-        var chatDock = page.getByTestId("chat-dock");
+    private void sendToDock(UnifiedPage page, String prompt) {
+        Page playwright = page.unwrap(Page.class);
+        // TODO unified: Dramafinder Escape Hatch: playwright.getByTestId("chat-dock")
+        var chatDock = playwright.getByTestId("chat-dock");
+        // TODO unified: Dramafinder Escape Hatch: MessageInputElement.get(chatDock).typeAndSubmit(prompt)
         MessageInputElement.get(chatDock).typeAndSubmit(prompt);
     }
 

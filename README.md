@@ -75,21 +75,36 @@ The same `MISE_MODEL_*` / `PORT` variables as the Docker run apply (including th
 
 ### Integration (browser) tests
 
-End-to-end tests live next to the unit tests in `src/test/java/.../it/` and are named `*IT.java`. They run a real Chromium under [Microsoft Playwright](https://playwright.dev/java/) against a real Spring Boot server, using [DramaFinder](https://github.com/parttio/dramafinder) wrappers for Vaadin component locators. They are **opt-in via the `it` Maven profile** so plain `./mvnw test` stays fast.
+End-to-end tests live next to the unit tests in `src/test/java/.../it/` and are named `*IT.java`. They are [Unified UI Tests](https://parttio.github.io/unified-testing-tool/): each test is written once against the Unified API and runs on two Testing Tools — **Browserless** (in the JVM, no browser) and **Playwright** (a real headless Chromium against a real Spring Boot server). They are **opt-in via the `it` Maven profile** so plain `./mvnw test` stays fast.
 
 ```bash
-# one-time per machine: download the Chromium browser
-./mvnw exec:java -Dexec.mainClass=com.microsoft.playwright.CLI \
-    -Dexec.args="install chromium" -Dexec.classpathScope=test
-
-# run all IT tests (headless — works in CI, dev containers, anywhere)
+# run all IT tests on Browserless, then on Playwright (headless — works in CI, dev containers, anywhere)
 ./mvnw -Pit verify
 
-# run a single IT test
+# run a single IT test (on both)
 ./mvnw -Pit verify -Dit.test=HomeViewIT
 ```
 
-> First run rebuilds the Vaadin frontend bundle (3–5 minutes). Subsequent runs are ~25 seconds.
+> First run rebuilds the Vaadin frontend bundle (3–5 minutes) and downloads Chromium's headless shell (~280 MB) on its own. Subsequent runs are about a minute for both tools.
+
+Each run writes a report per tool to `target/failsafe-reports/{browserless,playwright}/unified-evidence/`: `summary.md` / `report.html`, and every test's User Steps (`user-steps.txt`) — plus a screenshot or component tree when a test fails. The Playwright summary compares the run with the Browserless one and lists any test that passed on one tool and failed on the other.
+
+#### Evidence after every step (opt-in)
+
+To see what each step looked like, not just the failing one, turn on per-step snapshots and the Playwright trace:
+
+```bash
+./mvnw -Pit verify -Dit.test=HomeViewIT \
+  -Dvaadin.testing.user-steps.snapshots=true \
+  -Dvaadin.testing.playwright.trace=on
+```
+
+- `vaadin.testing.user-steps.snapshots=true` writes a snapshot after every User Step into `<TestClass>/<testMethod>/steps/` under each tool's evidence folder: `001.png`, `002.png`, … on Playwright, and `001.tree.txt` / `001.tree.html`, … on Browserless (a component tree: it has no browser to take a picture with).
+- `vaadin.testing.playwright.trace=on` keeps Playwright's trace as `trace.zip`, grouped by User Step (`on-failure` keeps it only for failing tests). Open it with `npx playwright show-trace <path>/trace.zip`.
+
+Both make runs slower and the reports bigger, so use them on one class rather than the whole suite.
+
+Open the two `*IT` reports with `open target/failsafe-reports/browserless/unified-evidence/report.html` and `open target/failsafe-reports/playwright/unified-evidence/report.html`. `target/surefire-reports/unified-evidence/` is the unit-test phase: it only holds `PlanViewBrowserlessTest`, the one Unified test named `*Test`.
 
 #### Headed (visible browser) mode
 
@@ -163,7 +178,7 @@ data/                   — H2 file-mode database (gitignored)
 
 The spec (`spec/`) covers use cases **UC-001..UC-013** plus UC-098 (local/Docker run) and UC-099 (user manual). On top of the runtime backbone (persistent H2 + H2 console; the Spring AI ↔ Vaadin `AIOrchestrator` ↔ persisted-conversation wiring), the application implements the core meal-planner flows: onboarding, viewing and editing the weekly plan via chat, undo/explain, the shopping list with detour reasoning, dynamic Reports widgets, insights, week navigation, generating future weeks, and chat busy feedback with a "stop" to cancel a running turn.
 
-Behaviour is covered across three test layers — unit + browserless (`./mvnw test`), Playwright IT (`./mvnw -Pit verify`), and AI tool IT against the live model (`./mvnw -Pai-it verify`).
+Behaviour is covered across three test layers — unit (`./mvnw test`), UI IT as Unified UI Tests on Browserless and Playwright (`./mvnw -Pit verify`), and AI tool IT against the live model (`./mvnw -Pai-it verify`).
 
 ## Getting started with Vaadin
 

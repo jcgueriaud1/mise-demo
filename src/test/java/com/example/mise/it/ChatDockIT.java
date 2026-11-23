@@ -10,20 +10,35 @@ import com.example.mise.domain.plan.MealEditRepository;
 import com.example.mise.domain.plan.MealRepository;
 import com.example.mise.domain.plan.PlanRepository;
 import com.example.mise.domain.plan.PlanService;
+import com.example.mise.it.support.TestAiConfig;
+import com.example.mise.it.support.TestChatModel;
+import com.example.mise.ui.plan.PlanView;
 
+import com.microsoft.playwright.Locator;
+import com.microsoft.playwright.Page;
+import com.vaadin.testing.unified.RequiresBrowser;
+import com.vaadin.testing.unified.RequiresTestingTool;
+import com.vaadin.testing.unified.TestingTool;
+import com.vaadin.testing.unified.UnifiedPage;
+import com.vaadin.testing.unified.component.UnifiedContainer;
+import com.vaadin.testing.unified.component.UnifiedDiv;
+import com.vaadin.testing.unified.component.UnifiedMessageInput;
+import com.vaadin.testing.unified.component.UnifiedMessageList;
+import com.vaadin.testing.unified.spring.UnifiedSpringBootTest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.vaadin.addons.dramafinder.element.MessageInputElement;
+import org.springframework.context.annotation.Import;
+import org.springframework.test.context.ActiveProfiles;
 
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 
-import org.assertj.core.api.Assertions;
 
-import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
+import static com.vaadin.testing.unified.assertion.UnifiedAssertions.assertThat;
 
 /**
  * UC-008 chat-dock interaction model — covers BR-08 (two-state dock), BR-09
@@ -39,7 +54,18 @@ import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertTha
  * response-complete. Releasing the latch lets the response finish and the
  * class clear.
  */
-class ChatDockIT extends MisePlaywrightIT {
+@UnifiedSpringBootTest
+@ActiveProfiles("it")
+@Import(TestAiConfig.class)
+class ChatDockIT {
+
+    @Autowired
+    protected TestChatModel chatModel;
+
+    @BeforeEach
+    void resetChatModelBetweenTests() {
+        chatModel.reset();
+    }
 
     @Autowired private HouseholdService householdService;
     @Autowired private HouseholdRepository householdRepository;
@@ -50,14 +76,8 @@ class ChatDockIT extends MisePlaywrightIT {
     @Autowired private RecipeCatalog recipeCatalog;
     @Autowired private ConversationMessageRepository conversationMessageRepository;
 
-    @Override
-    public String getView() {
-        return "/plan";
-    }
-
-    @Override
     @BeforeEach
-    public void setupTest() throws Exception {
+    void seed() {
         Household h = new Household();
         h.setName("IT ChatDock Household");
         h.setSize(2);
@@ -85,8 +105,6 @@ class ChatDockIT extends MisePlaywrightIT {
             row.setViewContext(ConversationMessage.ViewContext.PLAN);
             conversationMessageRepository.save(row);
         }
-
-        super.setupTest();
     }
 
     @AfterEach
@@ -106,56 +124,35 @@ class ChatDockIT extends MisePlaywrightIT {
     /**
      * BR-08 (two-state dock): blurred = collapsed (max-height 0, single-line
      * preview visible); focused = expanded (max-height > 0, preview hidden).
+     * Computed CSS needs a real browser.
      */
     @Test
-    void dockExpandsOnFocusAndCollapsesOnBlur() {
-        var chatDock = page.getByTestId("chat-dock");
-        assertThat(chatDock).isVisible();
+    @RequiresBrowser
+    @DisplayName("The chat dock expands on focus and collapses on blur")
+    void dockExpandsOnFocusAndCollapsesOnBlur(UnifiedPage page) {
+        // given: collapsed, the one-line preview of the last reply shown
+        page.navigate(PlanView.class);
+        UnifiedContainer dock = chatDock(page);
+        UnifiedMessageList history = dock.find(UnifiedMessageList.class);
+        UnifiedDiv preview = dock.find(UnifiedDiv.class).withClassName("mise-last-ai-message");
+        assertThat(dock).isVisible();
+        assertThat(history).hasCssValue("max-height", "0px");
+        assertThat(preview).isVisible();
 
-        // Initially collapsed: chat-history max-height is 0, preview shown.
-        // parseFloat() of "0px" yields a whole number — Playwright marshals it as
-        // Integer; non-whole values come back as Double. Cast through Number.
-        double initialHeight = ((Number) chatDock.evaluate(
-                "d => parseFloat(getComputedStyle(d.querySelector('.mise-chat-history')).maxHeight)"
-        )).doubleValue();
-        Assertions.assertThat(initialHeight).as("collapsed max-height").isLessThanOrEqualTo(1.0);
+        // when: the input takes focus, the dock expands (max-height transitions over ~180 ms)
+        dock.find(UnifiedMessageInput.class).element().focus();
 
-        Boolean previewVisibleBefore = (Boolean) chatDock.evaluate(
-                "d => getComputedStyle(d.querySelector('.mise-last-ai-message')).display !== 'none'"
-        );
-        Assertions.assertThat(previewVisibleBefore).as("preview visible when collapsed").isTrue();
+        // then
+        page.step("see the chat history expanded", () ->
+                page.waitUntil(() -> maxHeightPx(history) > 100));
+        assertThat(preview).isHidden();
 
-        // Focus the input → expand.
-        MessageInputElement.get(chatDock).focus();
+        // when: a click outside the dock blurs it
+        page.find(UnifiedContainer.class).withTestId("kpi-strip").click();
 
-        // Auto-wait for the focus-within style to land via Playwright's polling
-        // assertion; max-height transitions over ~180 ms.
-        page.waitForFunction(
-                "d => parseFloat(getComputedStyle(d.querySelector('.mise-chat-history')).maxHeight) > 100",
-                chatDock.elementHandle()
-        );
-
-        double expandedHeight = ((Number) chatDock.evaluate(
-                "d => parseFloat(getComputedStyle(d.querySelector('.mise-chat-history')).maxHeight)"
-        )).doubleValue();
-        Assertions.assertThat(expandedHeight).as("expanded max-height").isGreaterThan(100.0);
-
-        Boolean previewVisibleAfter = (Boolean) chatDock.evaluate(
-                "d => getComputedStyle(d.querySelector('.mise-last-ai-message')).display !== 'none'"
-        );
-        Assertions.assertThat(previewVisibleAfter).as("preview hidden when expanded").isFalse();
-
-        // Blur by clicking outside the dock (the meal grid is a safe target).
-        page.getByTestId("kpi-strip").click();
-        page.waitForFunction(
-                "d => parseFloat(getComputedStyle(d.querySelector('.mise-chat-history')).maxHeight) <= 1",
-                chatDock.elementHandle()
-        );
-
-        Boolean previewVisibleAfterBlur = (Boolean) chatDock.evaluate(
-                "d => getComputedStyle(d.querySelector('.mise-last-ai-message')).display !== 'none'"
-        );
-        Assertions.assertThat(previewVisibleAfterBlur).as("preview visible after re-collapse").isTrue();
+        // then
+        assertThat(history).hasCssValue("max-height", "0px");
+        assertThat(preview).isVisible();
     }
 
     /**
@@ -164,42 +161,32 @@ class ChatDockIT extends MisePlaywrightIT {
      * it was before.
      */
     @Test
-    void expandScrollsToLatestMessage() {
-        var chatDock = page.getByTestId("chat-dock");
-        MessageInputElement input = MessageInputElement.get(chatDock);
+    @RequiresTestingTool(TestingTool.PLAYWRIGHT)
+    @DisplayName("Expanding the chat dock scrolls to the latest message")
+    void expandScrollsToLatestMessage(UnifiedPage page) {
+        // given: the dock open
+        page.navigate(PlanView.class);
+        UnifiedContainer dock = chatDock(page);
+        UnifiedMessageList history = dock.find(UnifiedMessageList.class);
+        UnifiedMessageInput input = dock.find(UnifiedMessageInput.class);
+        input.element().focus();
+        page.step("see the chat history expanded", () ->
+                page.waitUntil(() -> maxHeightPx(history) > 100));
 
-        // Open the dock, scroll to the TOP of the history programmatically, then
-        // re-focus and assert it landed at the bottom.
-        input.focus();
-        page.waitForFunction(
-                "d => parseFloat(getComputedStyle(d.querySelector('.mise-chat-history')).maxHeight) > 100",
-                chatDock.elementHandle()
-        );
+        // Escape Hatch kept: JavaScript, the Unified API can neither set nor read a scroll position
+        Locator historyEl = page.unwrap(Page.class).getByTestId("chat-message-list");
+        historyEl.evaluate("h => { h.scrollTop = 0; }");
 
-        chatDock.evaluate("d => { d.querySelector('.mise-chat-history').scrollTop = 0; }");
+        // when: blur, then focus again to trigger the focusin handler
+        page.find(UnifiedContainer.class).withTestId("kpi-strip").click();
+        assertThat(history).hasCssValue("max-height", "0px");
+        input.element().focus();
 
-        // Blur the input, re-focus to trigger the focusin handler again.
-        page.getByTestId("kpi-strip").click();
-        page.waitForFunction(
-                "d => parseFloat(getComputedStyle(d.querySelector('.mise-chat-history')).maxHeight) <= 1",
-                chatDock.elementHandle()
-        );
-        input.focus();
-
-        // Wait for the transitionend-driven scroll to land. transitionend fires
-        // once the 180ms max-height transition completes; allow ~500ms buffer.
-        page.waitForFunction(
-                "d => { const h = d.querySelector('.mise-chat-history');"
-                + "      return h.scrollHeight - (h.scrollTop + h.clientHeight) < 5; }",
-                chatDock.elementHandle()
-        );
-
-        // Final assertion — confirm we're at the bottom.
-        Boolean atBottom = (Boolean) chatDock.evaluate(
-                "d => { const h = d.querySelector('.mise-chat-history');"
-                + "      return h.scrollHeight - (h.scrollTop + h.clientHeight) < 5; }"
-        );
-        Assertions.assertThat(atBottom).as("scrolled to bottom on expand").isTrue();
+        // then: the transitionend-driven scroll lands at the bottom
+        // Escape Hatch kept: JavaScript, scroll position (see above)
+        page.step("see the chat history scrolled to the latest message", () ->
+                page.waitUntil(() -> (Boolean) historyEl.evaluate(
+                        "h => h.scrollHeight - (h.scrollTop + h.clientHeight) < 5")));
     }
 
     /**
@@ -208,39 +195,29 @@ class ChatDockIT extends MisePlaywrightIT {
      * the pause-latch), the class is removed.
      */
     @Test
-    void aiWorkingClassToggledAroundSubmit() throws Exception {
+    @DisplayName("The chat dock shows it is working while a reply streams")
+    void aiWorkingClassToggledAroundSubmit(UnifiedPage page) {
+        // given: a reply that waits for the test's go-ahead
+        page.navigate(PlanView.class);
         CountDownLatch responseLatch = chatModel.pauseNextResponse();
         chatModel.queueReply("Sure — Thursday is Roasted Vegetable Pasta.");
 
-        var chatDock = page.getByTestId("chat-dock");
-        MessageInputElement input = MessageInputElement.get(chatDock);
-        input.typeAndSubmit("Swap Thursday for something vegetarian.");
+        // when
+        chatDock(page).find(UnifiedMessageInput.class).send("Swap Thursday for something vegetarian.");
 
-        // After submit, the submit-listener on the UI thread adds .ai-working.
-        // Wait for the class to appear (auto-polled, up to default timeout).
-        page.waitForFunction(
-                "d => d.classList.contains('ai-working')",
-                chatDock.elementHandle()
-        );
+        // then: .ai-working is set while streaming ...
+        assertThat(chatDock(page).withClassName("ai-working")).exists();
 
-        Boolean hasWorkingDuring = (Boolean) chatDock.evaluate(
-                "d => d.classList.contains('ai-working')"
-        );
-        Assertions.assertThat(hasWorkingDuring).as(".ai-working set while streaming").isTrue();
-
-        // Release the streaming pause so the responseCompleteListener can fire.
+        // ... and cleared once the response completes
         responseLatch.countDown();
+        assertThat(chatDock(page).withClassName("ai-working")).doesNotExist();
+    }
 
-        // Wait for class removal once response-complete clears it (wrapped in
-        // ui.access — round-trip via the streaming thread + UI push).
-        page.waitForFunction(
-                "d => !d.classList.contains('ai-working')",
-                chatDock.elementHandle()
-        );
+    private static UnifiedContainer chatDock(UnifiedPage page) {
+        return page.find(UnifiedContainer.class).withTestId("chat-dock");
+    }
 
-        Boolean hasWorkingAfter = (Boolean) chatDock.evaluate(
-                "d => d.classList.contains('ai-working')"
-        );
-        Assertions.assertThat(hasWorkingAfter).as(".ai-working cleared after response complete").isFalse();
+    private static double maxHeightPx(UnifiedMessageList history) {
+        return Double.parseDouble(history.element().getCssValue("max-height").replace("px", ""));
     }
 }

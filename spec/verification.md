@@ -73,7 +73,7 @@ Because most of this app's behavior is driven by an LLM, plain UI verification i
 
 ## 2a. Automated baselines
 
-A growing subset of the checks in §3 is covered by Playwright ITs under `src/test/java/com/example/mise/it/*IT.java`, runnable via `./mvnw -Pit verify`. The IT layer covers **deterministic surface** — route loads, page titles, component visibility, navigation, persisted state — but **does not replace the manual visual / AI checks below**: it does not screenshot-compare against the design system, does not call the real LLM, and runs against an in-memory H2 with no seed data.
+A growing subset of the checks in §3 is covered by UI ITs under `src/test/java/com/example/mise/it/*IT.java` — Unified UI Tests that `./mvnw -Pit verify` runs on Browserless and on Playwright (headless Chromium). The IT layer covers **deterministic surface** — route loads, page titles, component visibility, navigation, persisted state — but **does not replace the manual visual / AI checks below**: it does not screenshot-compare against the design system, does not call the real LLM, and runs against an in-memory H2 with no seed data.
 
 Per-use-case IT mapping (added as ITs land):
 

@@ -9,12 +9,23 @@ import com.example.mise.domain.plan.MealEditRepository;
 import com.example.mise.domain.plan.MealRepository;
 import com.example.mise.domain.plan.PlanRepository;
 import com.example.mise.domain.plan.PlanService;
+import com.example.mise.it.support.TestAiConfig;
+import com.example.mise.it.support.TestChatModel;
+import com.example.mise.ui.plan.PlanView;
 
+import com.vaadin.testing.unified.UnifiedPage;
+import com.vaadin.testing.unified.component.UnifiedContainer;
+import com.vaadin.testing.unified.component.UnifiedMessageInput;
+import com.vaadin.testing.unified.component.UnifiedMessageList;
+import com.vaadin.testing.unified.component.UnifiedSpan;
+import com.vaadin.testing.unified.spring.UnifiedSpringBootTest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.vaadin.addons.dramafinder.element.MessageInputElement;
+import org.springframework.context.annotation.Import;
+import org.springframework.test.context.ActiveProfiles;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -22,7 +33,7 @@ import java.util.concurrent.CountDownLatch;
 
 import org.assertj.core.api.Assertions;
 
-import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
+import static com.vaadin.testing.unified.assertion.UnifiedAssertions.assertThat;
 
 /**
  * UC-013: chat busy feedback + "stop" to cancel an in-flight turn.
@@ -39,7 +50,18 @@ import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertTha
  * <p>Setup mirrors {@link ChatDockIT}: seed a household + active plan so the Plan view
  * (which hosts the shared dock) renders.
  */
-class ChatBusyStopIT extends MisePlaywrightIT {
+@UnifiedSpringBootTest
+@ActiveProfiles("it")
+@Import(TestAiConfig.class)
+class ChatBusyStopIT {
+
+    @Autowired
+    protected TestChatModel chatModel;
+
+    @BeforeEach
+    void resetChatModelBetweenTests() {
+        chatModel.reset();
+    }
 
     @Autowired private HouseholdService householdService;
     @Autowired private HouseholdRepository householdRepository;
@@ -50,14 +72,8 @@ class ChatBusyStopIT extends MisePlaywrightIT {
     @Autowired private RecipeCatalog recipeCatalog;
     @Autowired private ConversationMessageRepository conversationMessageRepository;
 
-    @Override
-    public String getView() {
-        return "/plan";
-    }
-
-    @Override
     @BeforeEach
-    public void setupTest() throws Exception {
+    void seed() {
         Household h = new Household();
         h.setName("IT BusyStop Household");
         h.setSize(2);
@@ -68,8 +84,6 @@ class ChatBusyStopIT extends MisePlaywrightIT {
 
         var household = householdService.findHousehold().orElseThrow();
         planService.generateActivePlan(household, recipeCatalog);
-
-        super.setupTest();
     }
 
     @AfterEach
@@ -91,38 +105,31 @@ class ChatBusyStopIT extends MisePlaywrightIT {
      * busy note appears and the ignored prompt is not echoed into the conversation.
      */
     @Test
-    void submittingWhileBusy_showsBusyNote_andSuppressesPrompt() throws Exception {
+    @DisplayName("A prompt sent while a reply is streaming is held back with a busy note")
+    void submittingWhileBusy_showsBusyNote_andSuppressesPrompt(UnifiedPage page) {
+        // given: a first turn held in flight by the pause latch
+        page.navigate(PlanView.class);
         CountDownLatch responseLatch = chatModel.pauseNextResponse();
         chatModel.queueReply("Sure — Thursday is Roasted Vegetable Pasta.");
+        UnifiedContainer dock = chatDock(page);
+        UnifiedMessageInput input = dock.find(UnifiedMessageInput.class);
+        input.send("Swap Thursday for something vegetarian.");
+        assertThat(dock.withClassName("ai-working")).exists();
 
-        var chatDock = page.getByTestId("chat-dock");
-        MessageInputElement input = MessageInputElement.get(chatDock);
+        // when: a second prompt while busy
+        input.send("and also add chicken on Friday");
 
-        // First turn — held in flight by the pause latch.
-        input.typeAndSubmit("Swap Thursday for something vegetarian.");
-        page.waitForFunction("d => d.classList.contains('ai-working')", chatDock.elementHandle());
+        // then: it is suppressed and surfaced as a busy note ...
+        assertThat(busyNote(page)).isVisible().hasTextContaining("still working");
+        // ... and not echoed into the conversation
+        Assertions.assertThat(dock.find(UnifiedMessageList.class).getMessageTexts())
+                .as("the ignored second prompt must not be echoed into the conversation")
+                .noneMatch(text -> text.contains("add chicken on Friday"));
 
-        // Second submit while busy: must be suppressed and surfaced as a busy note.
-        input.typeAndSubmit("and also add chicken on Friday");
-
-        var busyNote = page.getByTestId("chat-busy-note");
-        page.waitForFunction("n => n && getComputedStyle(n).display !== 'none' && n.textContent.trim().length > 0",
-                busyNote.elementHandle());
-        assertThat(busyNote).isVisible();
-        assertThat(busyNote).containsText("still working");
-
-        // The suppressed prompt must NOT appear as a chat message.
-        Boolean suppressedEchoed = (Boolean) page.evaluate(
-                "() => [...document.querySelectorAll('vaadin-message')]"
-                + ".some(m => (m.textContent || '').includes('add chicken on Friday'))");
-        Assertions.assertThat(suppressedEchoed)
-                .as("the ignored second prompt must not be echoed into the conversation").isFalse();
-
-        // Let the first turn finish; the note clears on response-complete.
+        // when: the first turn finishes, the note clears
         responseLatch.countDown();
-        page.waitForFunction("d => !d.classList.contains('ai-working')", chatDock.elementHandle());
-        page.waitForFunction("n => getComputedStyle(n).display === 'none' || n.offsetParent === null",
-                busyNote.elementHandle());
+        assertThat(dock.withClassName("ai-working")).doesNotExist();
+        assertThat(busyNote(page)).isHidden();
     }
 
     /**
@@ -130,16 +137,13 @@ class ChatBusyStopIT extends MisePlaywrightIT {
      * never called.
      */
     @Test
-    void stopWhileIdle_showsNothingRunning_andNeverCallsModel() {
-        var chatDock = page.getByTestId("chat-dock");
-        MessageInputElement.get(chatDock).typeAndSubmit("stop");
+    @DisplayName("Stop with nothing running says so and never calls the model")
+    void stopWhileIdle_showsNothingRunning_andNeverCallsModel(UnifiedPage page) {
+        page.navigate(PlanView.class);
 
-        var busyNote = page.getByTestId("chat-busy-note");
-        page.waitForFunction("n => n && getComputedStyle(n).display !== 'none' && n.textContent.trim().length > 0",
-                busyNote.elementHandle());
-        assertThat(busyNote).isVisible();
-        assertThat(busyNote).containsText("Nothing is running");
+        chatDock(page).find(UnifiedMessageInput.class).send("stop");
 
+        assertThat(busyNote(page)).isVisible().hasTextContaining("Nothing is running");
         Assertions.assertThat(chatModel.receivedPrompts())
                 .as("idle \"stop\" must never reach the model").isEmpty();
     }
@@ -151,41 +155,41 @@ class ChatBusyStopIT extends MisePlaywrightIT {
      * Casing/whitespace are ignored ("  STOP ").
      */
     @Test
-    void stopWhileBusy_cancelsTurn_keepsPartialWithStoppedMarker() {
+    @DisplayName("Stop while a reply streams cancels it and keeps the partial reply, marked stopped")
+    void stopWhileBusy_cancelsTurn_keepsPartialWithStoppedMarker(UnifiedPage page) {
+        // given: a reply that streams one chunk and never completes on its own
+        page.navigate(PlanView.class);
         chatModel.holdNextResponseOpen("Here is what I am working on");
-
-        var chatDock = page.getByTestId("chat-dock");
-        MessageInputElement input = MessageInputElement.get(chatDock);
-
-        input.typeAndSubmit("Write me a very long detailed plan for the whole week.");
-        page.waitForFunction("d => d.classList.contains('ai-working')", chatDock.elementHandle());
-        // The held partial chunk has streamed into the assistant bubble.
-        page.waitForFunction(
-                "() => [...document.querySelectorAll('vaadin-message')]"
-                + ".some(m => (m.textContent || '').includes('what I am working on'))");
-
+        UnifiedContainer dock = chatDock(page);
+        UnifiedMessageInput input = dock.find(UnifiedMessageInput.class);
+        UnifiedMessageList messages = dock.find(UnifiedMessageList.class);
+        input.send("Write me a very long detailed plan for the whole week.");
+        assertThat(dock.withClassName("ai-working")).exists();
+        assertThat(messages).hasMessageContaining("what I am working on");
         int promptsBeforeStop = chatModel.receivedPrompts().size();
 
-        // Cancel. The model only emitted one chunk and never completed, so the turn can only
-        // end via this cancel — not via a natural completion or the 10s stub timeout.
-        input.typeAndSubmit("  STOP ");
+        // when: cancel. The turn can only end via this cancel — not via a natural
+        // completion or the 10s stub timeout.
+        input.send("  STOP ");
 
-        // .ai-working clears because the stream was cancelled.
-        page.waitForFunction("d => !d.classList.contains('ai-working')", chatDock.elementHandle());
-
-        // The partial reply survives, marked (stopped).
-        page.waitForFunction(
-                "() => [...document.querySelectorAll('vaadin-message')]"
-                + ".some(m => /\\(stopped\\)/.test(m.textContent || ''))");
-        Boolean stoppedKept = (Boolean) page.evaluate(
-                "() => [...document.querySelectorAll('vaadin-message')]"
-                + ".some(m => (m.textContent || '').includes('what I am working on')"
-                + " && /\\(stopped\\)/.test(m.textContent || ''))");
-        Assertions.assertThat(stoppedKept)
-                .as("partial reply is kept and marked (stopped)").isTrue();
+        // then: .ai-working clears because the stream was cancelled ...
+        assertThat(dock.withClassName("ai-working")).doesNotExist();
+        // ... and the partial reply survives, marked (stopped)
+        assertThat(messages).hasMessageContaining("(stopped)");
+        Assertions.assertThat(messages.getMessageTexts())
+                .as("partial reply is kept and marked (stopped)")
+                .anyMatch(text -> text.contains("what I am working on") && text.contains("(stopped)"));
 
         // "stop" itself must never have been sent to the model.
         Assertions.assertThat(chatModel.receivedPrompts().size())
                 .as("\"stop\" must not be sent to the model").isEqualTo(promptsBeforeStop);
+    }
+
+    private static UnifiedContainer chatDock(UnifiedPage page) {
+        return page.find(UnifiedContainer.class).withTestId("chat-dock");
+    }
+
+    private static UnifiedSpan busyNote(UnifiedPage page) {
+        return page.find(UnifiedSpan.class).withTestId("chat-busy-note");
     }
 }

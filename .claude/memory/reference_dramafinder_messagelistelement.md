@@ -7,6 +7,8 @@ metadata:
   originSessionId: 4878e101-3f89-431f-ba3c-67e683989ad5
 ---
 
+> **Legacy (2026-11-23):** Mise's UI tests now use Unified UI Tests — see [[reference-unified-testing]]. DramaFinder only arrives transitively, under `unified-test-playwright`.
+
 `MessageListElement.get(Locator)` (and `get(Page)`) in DramaFinder 1.1.0 performs a **nested search** for a `vaadin-message-list` element *inside* the provided scope. It does NOT wrap the scope locator as the message-list.
 
 **Consequence:** if you put `data-testid="chat-message-list"` directly on the `<vaadin-message-list>` element (which is the natural place — the testid IS the component), this silently fails:

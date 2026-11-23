@@ -2,15 +2,26 @@ package com.example.mise.it;
 
 import com.example.mise.domain.conversation.ConversationMessage;
 import com.example.mise.domain.conversation.ConversationMessageRepository;
+import com.example.mise.it.support.TestAiConfig;
+import com.example.mise.it.support.TestChatModel;
+import com.example.mise.ui.onboarding.OnboardingView;
 
+import com.vaadin.testing.unified.UnifiedPage;
+import com.vaadin.testing.unified.component.UnifiedMessageInput;
+import com.vaadin.testing.unified.component.UnifiedMessageList;
+import com.vaadin.testing.unified.spring.UnifiedSpringBootTest;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.vaadin.addons.dramafinder.element.MessageInputElement;
-import org.vaadin.addons.dramafinder.element.MessageListElement;
+import org.springframework.context.annotation.Import;
+import org.springframework.test.context.ActiveProfiles;
 
 import org.assertj.core.api.Assertions;
 
-import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
+import java.util.List;
+
+import static com.vaadin.testing.unified.assertion.UnifiedAssertions.assertThat;
 
 /**
  * UC-001 round-trip IT against a deterministic {@link com.example.mise.it.support.TestChatModel}.
@@ -24,51 +35,83 @@ import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertTha
  * <p>BR-01 (existing household → redirect to /plan) is covered by the companion
  * {@link OnboardingRedirectIT} class, which seeds the household before navigation.
  */
-class OnboardingViewIT extends MisePlaywrightIT {
+@UnifiedSpringBootTest
+@ActiveProfiles("it")
+@Import(TestAiConfig.class)
+class OnboardingViewIT {
+
+    @Autowired
+    protected TestChatModel chatModel;
+
+    @BeforeEach
+    void resetChatModelBetweenTests() {
+        chatModel.reset();
+    }
 
     private static final String OPENING_GREETING_FRAGMENT = "Hi — I'll set up your dinners";
 
     @Autowired
     ConversationMessageRepository conversationMessageRepository;
 
-    @Override
-    public String getView() {
-        return "/welcome";
+    @Test
+    @DisplayName("A first visit shows the onboarding greeting")
+    void seededGreetingRendersOnFirstLoad(UnifiedPage page) {
+        page.navigate(OnboardingView.class);
+
+        UnifiedMessageList messages = page.find(UnifiedMessageList.class);
+        assertThat(messages).hasMessageCount(1).hasMessageContaining(OPENING_GREETING_FRAGMENT);
     }
 
     @Test
-    void seededGreetingRendersOnFirstLoad() {
-        MessageListElement messages = MessageListElement.get(page);
-        messages.assertMessageCount(1);
-        assertThat(messages.getMessage(0)).containsText(OPENING_GREETING_FRAGMENT);
-    }
-
-    @Test
-    void userInputRoundTripsThroughStubbedAssistant() {
+    @DisplayName("The user's answer and the assistant's reply appear in the conversation")
+    void userInputRoundTripsThroughStubbedAssistant(UnifiedPage page) {
+        // given
+        page.navigate(OnboardingView.class);
         chatModel.queueReply("Got it — two adults, no fish, €90/week. Sound right?");
+        UnifiedMessageList messages = page.find(UnifiedMessageList.class);
 
-        MessageInputElement input = MessageInputElement.get(page);
-        MessageListElement messages = MessageListElement.get(page);
+        // when
+        page.find(UnifiedMessageInput.class).send("Two adults, no fish, around €90 a week");
 
-        input.typeAndSubmit("Two adults, no fish, around €90 a week");
-
-        // Greeting + user + assistant
-        messages.assertMessageCount(3);
-        assertThat(messages.getMessage(1)).containsText("Two adults, no fish");
-        assertThat(messages.getMessage(2)).containsText("Got it — two adults, no fish");
+        // then: greeting + user + assistant, in that order
+        assertThat(messages).hasMessageCount(3);
+        List<String> texts = messages.getMessageTexts();
+        Assertions.assertThat(texts.get(1)).contains("Two adults, no fish");
+        Assertions.assertThat(texts.get(2)).contains("Got it — two adults, no fish");
     }
 
     @Test
-    void defaultReplyUsedWhenTestForgetsToQueueOne() {
+    @DisplayName("Without a queued reply the stub answers with a sentinel, not the real model")
+    void defaultReplyUsedWhenTestForgetsToQueueOne(UnifiedPage page) {
         // Guardrail: a forgotten queueReply() shouldn't silently call the (unreachable) real LLM.
         // The stub falls back to a sentinel string instead.
-        MessageInputElement input = MessageInputElement.get(page);
-        MessageListElement messages = MessageListElement.get(page);
+        page.navigate(OnboardingView.class);
+        UnifiedMessageList messages = page.find(UnifiedMessageList.class);
 
-        input.typeAndSubmit("hello");
+        page.find(UnifiedMessageInput.class).send("hello");
 
-        messages.assertMessageCount(3);
-        assertThat(messages.getMessage(2)).containsText("no reply queued");
+        assertThat(messages).hasMessageCount(3);
+        Assertions.assertThat(messages.getMessageTexts().get(2)).contains("no reply queued");
+    }
+
+    /**
+     * Regression: opening onboarding again in the same UI re-runs {@code beforeEnter} on the
+     * same view instance; it must not build a second orchestrator on the view's one provider
+     * (found by this suite on Browserless, which keeps the UI across navigations).
+     */
+    @Test
+    @DisplayName("Opening onboarding again keeps the chat working and logs no error")
+    void reopeningOnboardingKeepsTheChatWorking(UnifiedPage page) {
+        // given
+        page.navigate(OnboardingView.class);
+
+        // when
+        page.navigate(OnboardingView.class);
+
+        // then
+        assertThat(page).hasNoErrors();
+        assertThat(page.find(UnifiedMessageList.class)).hasMessageCount(1);
+        assertThat(page.find(UnifiedMessageInput.class)).isVisible();
     }
 
     /**
@@ -84,21 +127,21 @@ class OnboardingViewIT extends MisePlaywrightIT {
      * column is set correctly for newly written rows.
      */
     @Test
-    void messagesPersistedWithOnboardingViewContext() {
+    @DisplayName("Onboarding messages are stored with the onboarding view context")
+    void messagesPersistedWithOnboardingViewContext(UnifiedPage page) {
+        // given
+        page.navigate(OnboardingView.class);
         chatModel.queueReply("Noted — I'll keep your preferences in mind.");
-        MessageInputElement input = MessageInputElement.get(page);
 
-        input.typeAndSubmit("Two adults, no allergies, €80/week");
+        // when
+        page.find(UnifiedMessageInput.class).send("Two adults, no allergies, €80/week");
 
-        // Wait for the assistant reply to land in the MessageList before checking the DB,
-        // ensuring onResponseComplete has had time to flush to the repository.
-        MessageListElement messages = MessageListElement.get(page);
-        messages.assertMessageCount(3);
-
-        long onboardingCount = conversationMessageRepository.findAll().stream()
-                .filter(m -> m.getViewContext() == ConversationMessage.ViewContext.ONBOARDING)
-                .count();
-
-        Assertions.assertThat(onboardingCount).isGreaterThan(0);
+        // then: the reply is shown ...
+        assertThat(page.find(UnifiedMessageList.class)).hasMessageCount(3);
+        // ... and persisted. The response listener stores the turn after the reply renders,
+        // so wait for the row rather than reading the repository once.
+        page.step("The conversation is stored as onboarding", () ->
+                page.waitUntil(() -> conversationMessageRepository.findAll().stream()
+                        .anyMatch(m -> m.getViewContext() == ConversationMessage.ViewContext.ONBOARDING)));
     }
 }

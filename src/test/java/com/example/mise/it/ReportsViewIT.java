@@ -2,6 +2,9 @@ package com.example.mise.it;
 
 import com.example.mise.ai.tools.ReportingTools;
 import com.example.mise.domain.preferences.ViewPreferenceService;
+import com.example.mise.it.support.TestAiConfig;
+import com.example.mise.it.support.TestChatModel;
+import com.example.mise.ui.reports.ReportsView;
 import com.example.mise.capabilities.recipes.RecipeCatalog;
 import com.example.mise.domain.conversation.ConversationMessageRepository;
 import com.example.mise.domain.household.Household;
@@ -14,16 +17,23 @@ import com.example.mise.domain.plan.PlanService;
 import com.example.mise.domain.preferences.ViewPreference;
 import com.example.mise.domain.preferences.ViewPreferenceRepository;
 
-import org.assertj.core.api.Assertions;
+import com.vaadin.testing.unified.UnifiedPage;
+import com.vaadin.testing.unified.component.UnifiedButton;
+import com.vaadin.testing.unified.component.UnifiedContainer;
+import com.vaadin.testing.unified.component.UnifiedGrid;
+import com.vaadin.testing.unified.spring.UnifiedSpringBootTest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
+import org.springframework.test.context.ActiveProfiles;
 
 import java.math.BigDecimal;
 import java.util.List;
 
-import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
+import static com.vaadin.testing.unified.assertion.UnifiedAssertions.assertThat;
 
 /**
  * UC-007 Playwright IT — Reports dashboard view at /reports.
@@ -41,7 +51,18 @@ import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertTha
  * <p>Cleanup in {@code @AfterEach} deletes rows in FK-safe order:
  * meal_edit → view_preference → conversation_message → meal → plan → household.
  */
-class ReportsViewIT extends MisePlaywrightIT {
+@UnifiedSpringBootTest
+@ActiveProfiles("it")
+@Import(TestAiConfig.class)
+class ReportsViewIT {
+
+    @Autowired
+    protected TestChatModel chatModel;
+
+    @BeforeEach
+    void resetChatModelBetweenTests() {
+        chatModel.reset();
+    }
 
     @Autowired
     private HouseholdService householdService;
@@ -76,18 +97,12 @@ class ReportsViewIT extends MisePlaywrightIT {
     @Autowired
     private ViewPreferenceService viewPreferenceService;
 
-    @Override
-    public String getView() {
-        return "/reports";
-    }
-
     /**
-     * Override: seed Household + 4 HISTORICAL plans + 1 ACTIVE plan BEFORE the base class
-     * navigates to /reports. Seeding history satisfies AC #1 ("≥4 weeks of data").
+     * Seed Household + 4 HISTORICAL plans + 1 ACTIVE plan before each test navigates
+     * to /reports. Seeding history satisfies AC #1 ("≥4 weeks of data").
      */
-    @Override
     @BeforeEach
-    public void setupTest() throws Exception {
+    void seed() {
         Household h = new Household();
         h.setName("IT Reports Household");
         h.setSize(2);
@@ -103,9 +118,6 @@ class ReportsViewIT extends MisePlaywrightIT {
 
         // Seed the current week's ACTIVE plan
         planService.generateActivePlan(household, recipeCatalog);
-
-        // Navigate AFTER seeding so ReportsView.beforeEnter() finds the household and plans
-        super.setupTest();
     }
 
     @AfterEach
@@ -130,7 +142,10 @@ class ReportsViewIT extends MisePlaywrightIT {
      * AC #1: /reports loads with the correct page title.
      */
     @Test
-    void hasPageTitle() {
+    @DisplayName("The reports page has its title")
+    void hasPageTitle(UnifiedPage page) {
+        page.navigate(ReportsView.class);
+
         assertThat(page).hasTitle("Mise — Reports");
     }
 
@@ -138,8 +153,11 @@ class ReportsViewIT extends MisePlaywrightIT {
      * AC #1: the root reports container is visible.
      */
     @Test
-    void reportsViewContainerIsVisible() {
-        assertThat(page.getByTestId("reports-view")).isVisible();
+    @DisplayName("The reports view is shown")
+    void reportsViewContainerIsVisible(UnifiedPage page) {
+        page.navigate(ReportsView.class);
+
+        assertThat(page.find(UnifiedContainer.class).withTestId("reports-view")).isVisible();
     }
 
     // ── AC #1: all three widgets render ───────────────────────────────────────
@@ -148,24 +166,33 @@ class ReportsViewIT extends MisePlaywrightIT {
      * AC #1: the weekly cost-trend chart container is visible.
      */
     @Test
-    void costTrendWidgetIsVisible() {
-        assertThat(page.getByTestId("report-cost-trend")).isVisible();
+    @DisplayName("The weekly cost trend chart is shown")
+    void costTrendWidgetIsVisible(UnifiedPage page) {
+        page.navigate(ReportsView.class);
+
+        assertThat(costTrend(page)).isVisible();
     }
 
     /**
      * AC #1: the cost-by-category chart container is visible.
      */
     @Test
-    void categoryBreakdownWidgetIsVisible() {
-        assertThat(page.getByTestId("report-category-breakdown")).isVisible();
+    @DisplayName("The cost by category chart is shown")
+    void categoryBreakdownWidgetIsVisible(UnifiedPage page) {
+        page.navigate(ReportsView.class);
+
+        assertThat(categoryBreakdown(page)).isVisible();
     }
 
     /**
      * AC #1: the per-meal leaderboard grid is visible.
      */
     @Test
-    void leaderboardWidgetIsVisible() {
-        assertThat(page.getByTestId("leaderboard-grid")).isVisible();
+    @DisplayName("The per-meal leaderboard is shown")
+    void leaderboardWidgetIsVisible(UnifiedPage page) {
+        page.navigate(ReportsView.class);
+
+        assertThat(leaderboard(page)).isVisible();
     }
 
     /**
@@ -173,31 +200,28 @@ class ReportsViewIT extends MisePlaywrightIT {
      * This mirrors the "allThreeWidgetsRender" specification item.
      */
     @Test
-    void allThreeWidgetsRender() {
-        assertThat(page.getByTestId("report-cost-trend")).isVisible();
-        assertThat(page.getByTestId("report-category-breakdown")).isVisible();
-        assertThat(page.getByTestId("leaderboard-grid")).isVisible();
+    @DisplayName("All three report widgets are shown")
+    void allThreeWidgetsRender(UnifiedPage page) {
+        page.navigate(ReportsView.class);
+
+        assertThat(costTrend(page)).isVisible();
+        assertThat(categoryBreakdown(page)).isVisible();
+        assertThat(leaderboard(page)).isVisible();
     }
 
     // ── AC #1: leaderboard has rows ───────────────────────────────────────────
 
     /**
      * AC #1: given 4 historical + 1 active plan (35 meals total), the leaderboard Grid
-     * must have at least 1 rendered row.
-     *
-     * <p>Vaadin Grid renders data rows inside {@code vaadin-grid-cell-content} elements.
-     * We assert the grid is non-empty by checking {@code vaadin-grid-cell-content} count
-     * is ≥ 1 scoped to the leaderboard container.
+     * must have at least 1 row.
      */
     @Test
-    void leaderboardGridHasRows() {
-        var leaderboardGrid = page.getByTestId("leaderboard-grid");
-        assertThat(leaderboardGrid).isVisible();
-        // Vaadin Grid renders row cells as vaadin-grid-cell-content inside the grid element
-        int cellCount = leaderboardGrid.locator("vaadin-grid-cell-content").count();
-        Assertions.assertThat(cellCount)
-                .as("Leaderboard must have at least 1 rendered cell (AC #1: ≥1 row)")
-                .isGreaterThanOrEqualTo(1);
+    @DisplayName("With four weeks of history the leaderboard has rows")
+    void leaderboardGridHasRows(UnifiedPage page) {
+        page.navigate(ReportsView.class);
+
+        assertThat(leaderboard(page)).isVisible();
+        assertThat(leaderboard(page).row(0)).exists();
     }
 
     // ── UC-012 BR-10: persisted query restores into the grid ─────────────────
@@ -207,19 +231,22 @@ class ReportsViewIT extends MisePlaywrightIT {
      * must be restored into the Grid on load — the custom column header appears.
      */
     @Test
-    void persistedLeaderboardQueryRestoresOnLoad() {
-        var household = householdService.findHousehold().orElseThrow();
-        viewPreferenceService.saveSettings(household.getId(), ViewPreference.View.REPORTS,
-                "leaderboard", java.util.Map.of("query",
-                        "SELECT recipe_name AS \"Meal\", COUNT(*) AS \"Cooked times\" "
-                        + "FROM meal_history GROUP BY recipe_name ORDER BY COUNT(*) DESC"));
+    @DisplayName("A saved leaderboard query is restored on load and survives a reload")
+    void persistedLeaderboardQueryRestoresOnLoad(UnifiedPage page) {
+        // given
+        page.navigate(ReportsView.class);
+        saveLeaderboardQuery("SELECT recipe_name AS \"Meal\", COUNT(*) AS \"Cooked times\" "
+                + "FROM meal_history GROUP BY recipe_name ORDER BY COUNT(*) DESC");
 
-        page.navigate(getUrl() + "/reports");
-        assertThat(page.getByTestId("leaderboard-grid").getByText("Cooked times")).isVisible();
+        // when
+        page.reload();
+
+        // then
+        assertThat(leaderboard(page)).hasColumn("Cooked times");
 
         // Second reload — the customization survives (persistence, not session state)
-        page.navigate(getUrl() + "/reports");
-        assertThat(page.getByTestId("leaderboard-grid").getByText("Cooked times")).isVisible();
+        page.reload();
+        assertThat(leaderboard(page)).hasColumn("Cooked times");
     }
 
     // ── UC-008 AC #2 / UC-012: derived kcal-per-euro leaderboard column ───────
@@ -237,21 +264,24 @@ class ReportsViewIT extends MisePlaywrightIT {
      * load, with the derived-column header rendered, and survives a reload.
      */
     @Test
-    void leaderboardKcalPerEuroColumnRestoresOnLoad() {
-        var household = householdService.findHousehold().orElseThrow();
-        viewPreferenceService.saveSettings(household.getId(), ViewPreference.View.REPORTS,
-                "leaderboard", java.util.Map.of("query",
-                        "SELECT recipe_name AS \"Meal\", COUNT(*) AS \"Times\", "
-                        + "ROUND(AVG(CAST(kcal_per_serving AS DOUBLE)) "
-                        + "/ AVG(CAST(est_cost_eur AS DOUBLE)), 1) AS \"kcal per euro\" "
-                        + "FROM meal_history GROUP BY recipe_name ORDER BY 3 DESC"));
+    @DisplayName("A saved kcal-per-euro leaderboard column is restored on load and survives a reload")
+    void leaderboardKcalPerEuroColumnRestoresOnLoad(UnifiedPage page) {
+        // given
+        page.navigate(ReportsView.class);
+        saveLeaderboardQuery("SELECT recipe_name AS \"Meal\", COUNT(*) AS \"Times\", "
+                + "ROUND(AVG(CAST(kcal_per_serving AS DOUBLE)) "
+                + "/ AVG(CAST(est_cost_eur AS DOUBLE)), 1) AS \"kcal per euro\" "
+                + "FROM meal_history GROUP BY recipe_name ORDER BY 3 DESC");
 
-        page.navigate(getUrl() + "/reports");
-        assertThat(page.getByTestId("leaderboard-grid").getByText("kcal per euro")).isVisible();
+        // when
+        page.reload();
+
+        // then
+        assertThat(leaderboard(page)).hasColumn("kcal per euro");
 
         // Second reload — the derived column survives (persistence, not session state).
-        page.navigate(getUrl() + "/reports");
-        assertThat(page.getByTestId("leaderboard-grid").getByText("kcal per euro")).isVisible();
+        page.reload();
+        assertThat(leaderboard(page)).hasColumn("kcal per euro");
     }
 
     // ── UC-012 BR-10: reset drops the persisted state ─────────────────────────
@@ -261,34 +291,59 @@ class ReportsViewIT extends MisePlaywrightIT {
      * ViewPreference row; after reload the widget is back on its default query.
      */
     @Test
-    void resetWidgetRevertsToDefaultQuery() {
-        var household = householdService.findHousehold().orElseThrow();
-        viewPreferenceService.saveSettings(household.getId(), ViewPreference.View.REPORTS,
-                "leaderboard", java.util.Map.of("query",
-                        "SELECT recipe_name AS \"Meal\", COUNT(*) AS \"Cooked times\" "
-                        + "FROM meal_history GROUP BY recipe_name ORDER BY COUNT(*) DESC"));
+    @DisplayName("Resetting the leaderboard brings back its default columns")
+    void resetWidgetRevertsToDefaultQuery(UnifiedPage page) {
+        // given
+        page.navigate(ReportsView.class);
+        saveLeaderboardQuery("SELECT recipe_name AS \"Meal\", COUNT(*) AS \"Cooked times\" "
+                + "FROM meal_history GROUP BY recipe_name ORDER BY COUNT(*) DESC");
+        page.reload();
+        assertThat(leaderboard(page)).hasColumn("Cooked times");
 
-        page.navigate(getUrl() + "/reports");
-        assertThat(page.getByTestId("leaderboard-grid").getByText("Cooked times")).isVisible();
-
+        // when
         reportingTools.resetReportsWidget("leaderboard");
+        page.reload();
 
-        page.navigate(getUrl() + "/reports");
-        assertThat(page.getByTestId("leaderboard-grid").getByText("Cooked times")).not().isVisible();
-        // Default query header is back
-        assertThat(page.getByTestId("leaderboard-grid").getByText("Times")).isVisible();
+        // then: the default query header is back
+        assertThat(leaderboard(page)).doesNotHaveColumn("Cooked times").hasColumn("Times");
     }
 
     // ── Reset buttons are rendered (UI surface) ───────────────────────────────
 
     /**
-     * AC: the per-widget reset buttons are present in the DOM (always rendered —
+     * AC: the per-widget reset buttons are present (always rendered —
      * see {@code widgetShell(...)} in ReportsView).
      */
     @Test
-    void resetButtonsArePresentForCustomisableWidgets() {
-        assertThat(page.getByTestId("report-reset-trendChart")).isAttached();
-        assertThat(page.getByTestId("report-reset-categoryChart")).isAttached();
-        assertThat(page.getByTestId("report-reset-leaderboard")).isAttached();
+    @DisplayName("Each customisable widget has a reset button")
+    void resetButtonsArePresentForCustomisableWidgets(UnifiedPage page) {
+        page.navigate(ReportsView.class);
+
+        assertThat(resetButton(page, "Weekly cost trend")).exists();
+        assertThat(resetButton(page, "Cost by category")).exists();
+        assertThat(resetButton(page, "Per-meal leaderboard")).exists();
+    }
+
+    private void saveLeaderboardQuery(String sql) {
+        var household = householdService.findHousehold().orElseThrow();
+        viewPreferenceService.saveSettings(household.getId(), ViewPreference.View.REPORTS,
+                "leaderboard", java.util.Map.of("query", sql));
+    }
+
+    // The charts have no Wrapper; their test ids are the only handle a test has.
+    private static UnifiedContainer costTrend(UnifiedPage page) {
+        return page.find(UnifiedContainer.class).withTestId("report-cost-trend");
+    }
+
+    private static UnifiedContainer categoryBreakdown(UnifiedPage page) {
+        return page.find(UnifiedContainer.class).withTestId("report-category-breakdown");
+    }
+
+    private static UnifiedGrid leaderboard(UnifiedPage page) {
+        return page.find(UnifiedGrid.class).withTestId("leaderboard-grid");
+    }
+
+    private static UnifiedButton resetButton(UnifiedPage page, String widgetTitle) {
+        return page.find(UnifiedButton.class).withAccessibleName("Revert " + widgetTitle + " to defaults");
     }
 }

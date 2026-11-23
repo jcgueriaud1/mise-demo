@@ -97,7 +97,12 @@ public class OnboardingView extends VerticalLayout implements BeforeEnterObserve
             event.forwardTo("plan");
             return;
         }
-        buildUI();
+        // Re-entering the same route in the same UI reuses this instance and fires
+        // beforeEnter again; the injected provider can serve only one AIOrchestrator,
+        // so build once (found by the Unified UI Tests on Browserless).
+        if (orchestrator == null) {
+            buildUI();
+        }
     }
 
     private void buildUI() {

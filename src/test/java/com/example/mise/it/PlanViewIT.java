@@ -12,14 +12,28 @@ import com.example.mise.domain.plan.MealRepository;
 import com.example.mise.domain.plan.PinnedMealException;
 import com.example.mise.domain.plan.PlanRepository;
 import com.example.mise.domain.plan.PlanService;
+import com.example.mise.it.support.TestAiConfig;
+import com.example.mise.it.support.TestChatModel;
+import com.example.mise.ui.plan.PlanView;
 
+import com.vaadin.testing.unified.UnifiedPage;
+import com.vaadin.testing.unified.component.UnifiedButton;
+import com.vaadin.testing.unified.component.UnifiedContainer;
+import com.vaadin.testing.unified.component.UnifiedDiv;
+import com.vaadin.testing.unified.component.UnifiedMessageInput;
+import com.vaadin.testing.unified.component.UnifiedMessageList;
+import com.vaadin.testing.unified.component.UnifiedNotification;
+import com.vaadin.testing.unified.component.UnifiedParagraph;
+import com.vaadin.testing.unified.component.UnifiedSpan;
+import com.vaadin.testing.unified.spring.UnifiedSpringBootTest;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.vaadin.addons.dramafinder.element.MessageInputElement;
-import org.vaadin.addons.dramafinder.element.MessageListElement;
+import org.springframework.context.annotation.Import;
+import org.springframework.test.context.ActiveProfiles;
 
 import java.math.BigDecimal;
 import java.time.DayOfWeek;
@@ -27,7 +41,7 @@ import java.time.LocalDate;
 import java.time.temporal.TemporalAdjusters;
 import java.util.List;
 
-import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
+import static com.vaadin.testing.unified.assertion.UnifiedAssertions.assertThat;
 
 /**
  * UC-002 + UC-003 Playwright IT — Plan view with seeded household + active plan.
@@ -43,7 +57,18 @@ import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertTha
  * <p>Cleanup in {@code @AfterEach} deletes rows in FK-safe order:
  * meal_edit → conversation_message → meal → plan → household.
  */
-class PlanViewIT extends MisePlaywrightIT {
+@UnifiedSpringBootTest
+@ActiveProfiles("it")
+@Import(TestAiConfig.class)
+class PlanViewIT {
+
+    @Autowired
+    protected TestChatModel chatModel;
+
+    @BeforeEach
+    void resetChatModelBetweenTests() {
+        chatModel.reset();
+    }
 
     @Autowired
     private HouseholdService householdService;
@@ -69,19 +94,9 @@ class PlanViewIT extends MisePlaywrightIT {
     @Autowired
     private ConversationMessageRepository conversationMessageRepository;
 
-    @Override
-    public String getView() {
-        return "/plan";
-    }
-
-    /**
-     * Override to seed state BEFORE the base class navigates to /plan.
-     * The base @BeforeEach on setupTest() is hidden by this override in JUnit 5;
-     * super.setupTest() must be called explicitly to perform the browser navigation.
-     */
-    @Override
+    /** Seed a household and its active plan before each test navigates to /plan. */
     @BeforeEach
-    public void setupTest() throws Exception {
+    void seed() {
         // Seed household
         Household h = new Household();
         h.setName("IT Plan Household");
@@ -95,9 +110,6 @@ class PlanViewIT extends MisePlaywrightIT {
         // the YAML catalog and saves Plan + 7 Meal rows with status=PLANNED.
         var household = householdService.findHousehold().orElseThrow();
         planService.generateActivePlan(household, recipeCatalog);
-
-        // Navigate AFTER seeding so PlanView.beforeEnter() finds the household and plan.
-        super.setupTest();
     }
 
     @AfterEach
@@ -120,7 +132,10 @@ class PlanViewIT extends MisePlaywrightIT {
      * UC-002 AC: loading /plan renders the page with the correct title.
      */
     @Test
-    void hasPageTitle() {
+    @DisplayName("The plan page has its title")
+    void hasPageTitle(UnifiedPage page) {
+        page.navigate(PlanView.class);
+
         assertThat(page).hasTitle("Mise — Plan");
     }
 
@@ -129,12 +144,16 @@ class PlanViewIT extends MisePlaywrightIT {
      * BR-03: stats are computed from the currently shown meals.
      */
     @Test
-    void kpiStripRenders() {
-        assertThat(page.getByTestId("kpi-strip")).isVisible();
-        assertThat(page.getByTestId("kpi-card-weekly-cost")).isVisible();
-        assertThat(page.getByTestId("kpi-card-avg-meal")).isVisible();
-        assertThat(page.getByTestId("kpi-card-total-prep")).isVisible();
-        assertThat(page.getByTestId("kpi-card-avg-kcal")).isVisible();
+    @DisplayName("The weekly KPI strip shows its four cards")
+    void kpiStripRenders(UnifiedPage page) {
+        page.navigate(PlanView.class);
+
+        // KpiCard is a project component without a Wrapper; its test id is its only handle
+        assertThat(kpiStrip(page)).isVisible();
+        assertThat(page.find(UnifiedContainer.class).withTestId("kpi-card-weekly-cost")).isVisible();
+        assertThat(page.find(UnifiedContainer.class).withTestId("kpi-card-avg-meal")).isVisible();
+        assertThat(page.find(UnifiedContainer.class).withTestId("kpi-card-total-prep")).isVisible();
+        assertThat(page.find(UnifiedContainer.class).withTestId("kpi-card-avg-kcal")).isVisible();
     }
 
     /**
@@ -142,49 +161,43 @@ class PlanViewIT extends MisePlaywrightIT {
      * BR-02: grid always has 7 rows; missing slots show empty placeholders.
      */
     @Test
-    void mealGridHasSevenRows() {
-        assertThat(page.getByTestId("meal-row")).hasCount(7);
+    @DisplayName("The meal grid has seven rows")
+    void mealGridHasSevenRows(UnifiedPage page) {
+        page.navigate(PlanView.class);
+
+        assertThat(page.find(UnifiedDiv.class).withTestId("meal-row")).hasCount(7);
     }
 
     /**
      * UC-002 AC: the cost-by-category panel is visible and shows its title.
      */
     @Test
-    void costByCategoryPanelRenders() {
-        assertThat(page.getByTestId("cost-by-category-panel")).isVisible();
-        assertThat(page.getByTestId("cost-by-category-panel").getByText("COST BY CATEGORY"))
-                .isVisible();
+    @DisplayName("The cost by category panel is shown with its title")
+    void costByCategoryPanelRenders(UnifiedPage page) {
+        page.navigate(PlanView.class);
+
+        UnifiedContainer panel = page.find(UnifiedContainer.class).withTestId("cost-by-category-panel");
+        assertThat(panel).isVisible();
+        assertThat(panel.find(UnifiedParagraph.class).withText("COST BY CATEGORY")).isVisible();
     }
 
     /**
      * UC-002 AC: chat round-trip via the shared dock works correctly on the Plan view.
-     * The stubbed assistant reply appears in the MessageList and updates the preview span.
-     *
-     * <p>Locator note: {@code data-testid="chat-message-list"} is set directly on the
-     * {@code vaadin-message-list} element. We wrap it with {@code new MessageListElement(...)}
-     * rather than the {@code get(locator)} factory, which would search for a
-     * {@code vaadin-message-list} *inside* the provided locator (one level too deep).
+     * The stubbed assistant reply appears in the MessageList and updates the preview.
      */
     @Test
-    void chatRoundTripWorksOnSharedDock() {
+    @DisplayName("A chat round trip on the plan updates the conversation and the reply preview")
+    void chatRoundTripWorksOnSharedDock(UnifiedPage page) {
+        // given
+        page.navigate(PlanView.class);
         chatModel.queueReply("Friday is creamy salmon pasta.");
 
-        // Scope the MessageInput to the chat dock — chat-dock contains vaadin-message-input.
-        var chatDockLocator = page.getByTestId("chat-dock");
-        MessageInputElement input = MessageInputElement.get(chatDockLocator);
-        input.typeAndSubmit("What's on Friday?");
+        // when
+        sendInChatDock(page, "What's on Friday?");
 
-        // Focus the message input to trigger :focus-within on the dock, which CSS
-        // expands the message-history region from max-height:0 to visible.
-        input.focus();
-
-        // Wrap the testid locator directly — the testid IS the vaadin-message-list.
-        MessageListElement messages = new MessageListElement(page.getByTestId("chat-message-list"));
-        messages.assertMessageCount(2);
-
-        // The last-AI-message preview span must be updated with the queued reply.
-        assertThat(page.getByTestId("chat-last-ai-message"))
-                .containsText("Friday is creamy salmon pasta.");
+        // then
+        assertThat(chatDock(page).find(UnifiedMessageList.class)).hasMessageCount(2);
+        assertThat(lastAiMessage(page)).hasTextContaining("Friday is creamy salmon pasta.");
     }
 
     /**
@@ -192,24 +205,23 @@ class PlanViewIT extends MisePlaywrightIT {
      * ViewContext.PLAN so the conversation is correctly attributed to the Plan view.
      */
     @Test
-    void conversationPersistedWithPlanViewContext() {
+    @DisplayName("Chat messages sent on the plan are stored with the plan view context")
+    void conversationPersistedWithPlanViewContext(UnifiedPage page) {
+        // given
+        page.navigate(PlanView.class);
         chatModel.queueReply("Friday is creamy salmon pasta.");
 
-        var chatDockLocator = page.getByTestId("chat-dock");
-        MessageInputElement input = MessageInputElement.get(chatDockLocator);
-        input.typeAndSubmit("What's on Friday?");
+        // when
+        sendInChatDock(page, "What's on Friday?");
 
-        // Focus the input to expand the dock and wait for the assistant turn to land.
-        input.focus();
-        // Wrap testid locator directly (testid IS the vaadin-message-list element).
-        MessageListElement messages = new MessageListElement(page.getByTestId("chat-message-list"));
-        messages.assertMessageCount(2);
-
-        // Both the user and assistant messages should be stamped PLAN.
-        var rows = conversationMessageRepository.findAll();
-        Assertions.assertThat(rows)
-                .filteredOn(r -> r.getViewContext() == ConversationMessage.ViewContext.PLAN)
-                .hasSizeGreaterThanOrEqualTo(2);
+        // then: shown ...
+        assertThat(chatDock(page).find(UnifiedMessageList.class)).hasMessageCount(2);
+        // ... and both turns stored as PLAN. The response listener stores the turn after
+        // the reply renders, so wait for the rows rather than reading them once.
+        page.step("The conversation is stored as plan", () ->
+                page.waitUntil(() -> conversationMessageRepository.findAll().stream()
+                        .filter(r -> r.getViewContext() == ConversationMessage.ViewContext.PLAN)
+                        .count() >= 2));
     }
 
     // ── UC-003 tests ──────────────────────────────────────────────────────────
@@ -218,8 +230,11 @@ class PlanViewIT extends MisePlaywrightIT {
      * UC-003 UI requirement: a pin icon button is visible on every meal row (Mon–Sun).
      */
     @Test
-    void pinButtonVisibleOnEveryRow() {
-        assertThat(page.getByTestId("meal-action-pin")).hasCount(7);
+    @DisplayName("Every meal row has a pin button")
+    void pinButtonVisibleOnEveryRow(UnifiedPage page) {
+        page.navigate(PlanView.class);
+
+        assertThat(page.find(UnifiedButton.class).withTestId("meal-action-pin")).hasCount(7);
     }
 
     /**
@@ -228,42 +243,30 @@ class PlanViewIT extends MisePlaywrightIT {
      * view is reloaded.
      */
     @Test
-    void editedPillRendersAfterAiSwap() {
-        var household = householdService.findHousehold().orElseThrow();
-        var plan = planService.findActivePlan(household.getId()).orElseThrow();
+    @DisplayName("A meal the AI just swapped shows the edited pill")
+    void editedPillRendersAfterAiSwap(UnifiedPage page) {
+        // given
+        page.navigate(PlanView.class);
+        Meal thursdayMeal = findMealForDay(DayOfWeek.THURSDAY);
 
-        // Find Thursday's meal
-        LocalDate thursday = plan.getWeekStartDate()
-                .with(TemporalAdjusters.nextOrSame(DayOfWeek.THURSDAY));
-        Meal thursdayMeal = planService.findMeals(plan.getId()).stream()
-                .filter(m -> m.getDate().equals(thursday))
-                .findFirst()
-                .orElseThrow(() -> new AssertionError("No Thursday meal in seeded plan"));
-
-        // Pick a different recipe to swap in
-        String newRecipeRef = recipeCatalog.findAll().stream()
-                .map(r -> r.getId())
-                .filter(id -> !id.equals(thursdayMeal.getRecipeRef()))
-                .findFirst()
-                .orElseThrow(() -> new AssertionError("No alternative recipe found in catalog"));
-
-        // Perform the AI swap directly (sets lastEditedBy=AI, lastEditedAt=now, status=EDITED)
-        planService.swapMeal(thursdayMeal.getId(), newRecipeRef,
+        // when: the AI swap (sets lastEditedBy=AI, lastEditedAt=now, status=EDITED),
+        // then a reload so PlanView.beforeEnter() re-fetches the meals
+        planService.swapMeal(thursdayMeal.getId(), findAlternativeRecipe(thursdayMeal.getRecipeRef()),
                 "vegetarian alternative for kid-friendly request");
+        page.reload();
 
-        // Reload /plan so PlanView.beforeEnter() re-fetches and re-renders with fresh meal data
-        page.navigate(getUrl() + "/plan");
-
-        // The edited pill must appear on Thursday's row within the 60-second window
-        assertThat(page.locator("[data-meal-date='" + thursday + "'] [data-testid='meal-status-edited-pill']"))
-                .isVisible();
+        // then: the pill appears on Thursday's row within the 60-second window
+        assertThat(mealRow(page, thursdayMeal.getDate()).find(UnifiedSpan.class)
+                .withTestId("meal-status-edited-pill")).isVisible();
     }
 
     /**
      * UC-003 BR-01: every AI-driven meal swap produces exactly one {@link
      * com.example.mise.domain.plan.MealEdit} row with the correct audit fields.
+     * A service-level check; it opens no page.
      */
     @Test
+    @DisplayName("An AI swap writes one audit row")
     void mealEditRowPersistedAfterAiSwap() {
         var household = householdService.findHousehold().orElseThrow();
         var plan = planService.findActivePlan(household.getId()).orElseThrow();
@@ -295,76 +298,67 @@ class PlanViewIT extends MisePlaywrightIT {
 
     /**
      * UC-003 BR-03: attempting to swap a pinned meal throws {@link PinnedMealException};
-     * after a reload the row still shows the original recipe.
+     * after a reload the row is still there.
      */
     @Test
-    void pinnedMealRejectsSwap() {
-        var household = householdService.findHousehold().orElseThrow();
-        var plan = planService.findActivePlan(household.getId()).orElseThrow();
-
-        LocalDate monday = plan.getWeekStartDate();
-        Meal mondayMeal = planService.findMeals(plan.getId()).stream()
-                .filter(m -> m.getDate().equals(monday))
-                .findFirst()
-                .orElseThrow(() -> new AssertionError("No Monday meal in seeded plan"));
-
-        String newRecipeRef = recipeCatalog.findAll().stream()
-                .map(r -> r.getId())
-                .filter(id -> !id.equals(mondayMeal.getRecipeRef()))
-                .findFirst()
-                .orElseThrow(() -> new AssertionError("No alternative recipe found in catalog"));
-
-        // Pin the meal via the explicit-editor overload (UC-003)
+    @DisplayName("A pinned meal can't be swapped and its row stays")
+    void pinnedMealRejectsSwap(UnifiedPage page) {
+        // given: Monday pinned via the explicit-editor overload (UC-003)
+        page.navigate(PlanView.class);
+        Meal mondayMeal = findMealForDay(DayOfWeek.MONDAY);
+        String newRecipeRef = findAlternativeRecipe(mondayMeal.getRecipeRef());
         planService.setPinned(mondayMeal.getId(), true, Meal.Editor.USER);
 
-        // Attempting to swap a pinned meal must throw PinnedMealException
+        // when / then: the swap is rejected
         Assertions.assertThatThrownBy(() ->
                 planService.swapMeal(mondayMeal.getId(), newRecipeRef, "test"))
                 .isInstanceOf(PinnedMealException.class);
 
-        // Reload the view and confirm Monday's row is still present (original recipe untouched)
-        page.navigate(getUrl() + "/plan");
-        assertThat(page.locator("[data-meal-date='" + monday + "']")).isVisible();
+        // then: after a reload Monday's row is still present
+        page.reload();
+        assertThat(mealRow(page, mondayMeal.getDate())).isVisible();
     }
 
     /**
      * UC-003 UI surface: the stubbed assistant reply appears in the message list and
-     * the last-AI-message preview span after typing into the chat dock on /plan.
+     * the last-AI-message preview after typing into the chat dock on /plan.
      * Tool-call behaviour is covered by PlanToolsTest unit tests; this test only
      * asserts the chat UI surface.
      */
     @Test
-    void chatRoundTripOnPlanViewWithStubbedSwap() {
+    @DisplayName("A swap request in the chat shows the assistant's reply")
+    void chatRoundTripOnPlanViewWithStubbedSwap(UnifiedPage page) {
+        // given
+        page.navigate(PlanView.class);
         String reply = "Swapped Thursday’s meal for a vegetarian option — kid-friendly pea risotto, under 30 min.";
         chatModel.queueReply(reply);
 
-        var chatDockLocator = page.getByTestId("chat-dock");
-        MessageInputElement input = MessageInputElement.get(chatDockLocator);
-        input.typeAndSubmit("Make Thursday vegetarian, kid is having a friend over.");
+        // when
+        sendInChatDock(page, "Make Thursday vegetarian, kid is having a friend over.");
 
-        input.focus();
-        MessageListElement messages = new MessageListElement(page.getByTestId("chat-message-list"));
-        messages.assertMessageCount(2);
-
-        assertThat(page.getByTestId("chat-last-ai-message")).containsText(reply);
+        // then
+        assertThat(chatDock(page).find(UnifiedMessageList.class)).hasMessageCount(2);
+        assertThat(lastAiMessage(page)).hasTextContaining(reply);
     }
 
     /**
-     * UC-003 locator stability: every meal row carries a {@code data-pin-date} attribute
+     * UC-003 locator stability: every pin button carries a {@code data-pin-date} attribute
      * matching its ISO date, allowing per-day pin assertions in later UCs.
      */
     @Test
-    void pinButtonHasDataPinDateAttribute() {
-        // At least one [data-pin-date] element must be visible — proves the per-day
-        // locator pattern works for later UC assertions.
-        assertThat(page.locator("[data-pin-date]").first()).isVisible();
+    @DisplayName("Pin buttons carry their day's date")
+    void pinButtonHasDataPinDateAttribute(UnifiedPage page) {
+        page.navigate(PlanView.class);
+        LocalDate monday = findMealForDay(DayOfWeek.MONDAY).getDate();
+
+        assertThat(page.find(UnifiedButton.class).withTestId("meal-action-pin")
+                .withAttribute("data-pin-date", monday.toString())).isVisible();
     }
 
     // ─── UC-004 ──────────────────────────────────────────────────────────────
 
     /**
-     * Helper: finds the first meal for the given day of week in the active plan
-     * and returns an alternative recipe ref that differs from the meal's current one.
+     * Helper: finds the first meal for the given day of week in the active plan.
      */
     private Meal findMealForDay(DayOfWeek dayOfWeek) {
         var household = householdService.findHousehold().orElseThrow();
@@ -377,6 +371,7 @@ class PlanViewIT extends MisePlaywrightIT {
                 .orElseThrow(() -> new AssertionError("No meal on " + dayOfWeek + " in seeded plan"));
     }
 
+    /** Helper: a recipe ref that differs from {@code excludeRef}. */
     private String findAlternativeRecipe(String excludeRef) {
         return recipeCatalog.findAll().stream()
                 .map(r -> r.getId())
@@ -387,38 +382,42 @@ class PlanViewIT extends MisePlaywrightIT {
 
     /**
      * UC-004 AC: the undo icon button is visible on a row that has a MealEdit history row.
-     * Seeds one AI swap via planService.swapMeal(), reloads the view, asserts the
-     * per-day undo button is visible.
      */
     @Test
-    void undoButtonVisibleOnRowWithEditHistory() {
+    @DisplayName("A row with edit history has an undo button")
+    void undoButtonVisibleOnRowWithEditHistory(UnifiedPage page) {
+        // given: one AI swap on Wednesday
+        page.navigate(PlanView.class);
         Meal wednesday = findMealForDay(DayOfWeek.WEDNESDAY);
-        String altRef = findAlternativeRecipe(wednesday.getRecipeRef());
-        planService.swapMeal(wednesday.getId(), altRef, "vegetarian swap for IT");
+        planService.swapMeal(wednesday.getId(), findAlternativeRecipe(wednesday.getRecipeRef()),
+                "vegetarian swap for IT");
 
-        page.navigate(getUrl() + "/plan");
+        // when
+        page.reload();
 
-        assertThat(page.getByTestId("meal-action-undo").first()).isVisible();
+        // then
+        assertThat(undoButton(page, "Wednesday")).isVisible();
     }
 
     /**
      * UC-004 AC: the undo icon button is NOT visible on a row with no edit history.
-     * Only meals that have been swapped by AI get undo buttons; the seeded plan has
-     * no edits on any row. After seeding a swap for Wednesday only, Monday must NOT
-     * have an undo button.
+     * After seeding a swap for Wednesday only, Monday must NOT have an undo button.
      */
     @Test
-    void undoButtonNotVisibleOnRowWithNoHistory() {
-        // Swap Wednesday so that "at least one undo button" exists (confirms the feature
-        // is active) but Monday has no history — its undo button must be absent.
+    @DisplayName("A row without edit history has no undo button")
+    void undoButtonNotVisibleOnRowWithNoHistory(UnifiedPage page) {
+        // given: Wednesday swapped, so the feature is active, but Monday has no history
+        page.navigate(PlanView.class);
         Meal wednesday = findMealForDay(DayOfWeek.WEDNESDAY);
-        String altRef = findAlternativeRecipe(wednesday.getRecipeRef());
-        planService.swapMeal(wednesday.getId(), altRef, "vegetarian swap for IT");
+        planService.swapMeal(wednesday.getId(), findAlternativeRecipe(wednesday.getRecipeRef()),
+                "vegetarian swap for IT");
 
-        page.navigate(getUrl() + "/plan");
+        // when
+        page.reload();
 
-        // Monday has no edit history — its undo button must not be in the DOM / visible.
-        assertThat(page.locator("#mise-meal-undo-monday")).not().isVisible();
+        // then
+        assertThat(undoButton(page, "Wednesday")).isVisible();
+        assertThat(undoButton(page, "Monday").visible()).doesNotExist();
     }
 
     /**
@@ -427,28 +426,27 @@ class PlanViewIT extends MisePlaywrightIT {
      * (c) the post-undo MealEdit count for that meal = pre-undo count + 1.
      */
     @Test
-    void clickingRowUndoRestoresPreviousRecipeAndWritesUndoAuditRow() {
+    @DisplayName("Undo on a row restores the previous recipe and writes an undo audit row")
+    void clickingRowUndoRestoresPreviousRecipeAndWritesUndoAuditRow(UnifiedPage page) {
+        // given: Thursday swapped
+        page.navigate(PlanView.class);
         Meal thursday = findMealForDay(DayOfWeek.THURSDAY);
         String originalRef = thursday.getRecipeRef();
-        String altRef = findAlternativeRecipe(originalRef);
-
-        planService.swapMeal(thursday.getId(), altRef, "swap for IT undo test");
-
+        planService.swapMeal(thursday.getId(), findAlternativeRecipe(originalRef), "swap for IT undo test");
         int preUndoCount = mealEditRepository.findByMealIdOrderByChangedAtDesc(thursday.getId()).size();
+        page.reload();
 
-        page.navigate(getUrl() + "/plan");
+        // when
+        undoButton(page, "Thursday").click();
 
-        // Click the per-day undo button for Thursday
-        page.locator("#mise-meal-undo-thursday").click();
+        // then: the user is told ...
+        assertThat(page.find(UnifiedNotification.class).withText("Undo applied")).exists();
 
-        // Wait for the Vaadin notification to confirm undo was applied
-        assertThat(page.getByText("Undo applied")).isVisible();
-
-        // Assert DB state: recipeRef restored
+        // ... the recipe is restored ...
         Meal reloaded = mealRepository.findById(thursday.getId()).orElseThrow();
         Assertions.assertThat(reloaded.getRecipeRef()).isEqualTo(originalRef);
 
-        // Assert DB state: new undo audit row created
+        // ... and a new undo audit row is written
         var editsAfter = mealEditRepository.findByMealIdOrderByChangedAtDesc(thursday.getId());
         Assertions.assertThat(editsAfter).hasSize(preUndoCount + 1);
         Assertions.assertThat(editsAfter.get(0).getReason()).startsWith("Undo of edit");
@@ -460,45 +458,44 @@ class PlanViewIT extends MisePlaywrightIT {
      * and the stubbed assistant reply lands as a second message.
      */
     @Test
-    void whyButtonClickSubmitsChatMessageAndReceivesReply() {
+    @DisplayName("Why? on an edited row asks the chat and shows the reply")
+    void whyButtonClickSubmitsChatMessageAndReceivesReply(UnifiedPage page) {
+        // given: Friday swapped
+        page.navigate(PlanView.class);
         Meal friday = findMealForDay(DayOfWeek.FRIDAY);
-        String altRef = findAlternativeRecipe(friday.getRecipeRef());
-        planService.swapMeal(friday.getId(), altRef, "fish swap for IT why test");
-
-        page.navigate(getUrl() + "/plan");
-
+        planService.swapMeal(friday.getId(), findAlternativeRecipe(friday.getRecipeRef()),
+                "fish swap for IT why test");
+        page.reload();
         chatModel.queueReply("I swapped Friday because of your fish allergy preference.");
-
         // Focus the chat input to expand the dock so the message list is visible
-        var chatDockLocator = page.getByTestId("chat-dock");
-        MessageInputElement input = MessageInputElement.get(chatDockLocator);
-        input.focus();
+        chatDock(page).find(UnifiedMessageInput.class).element().focus();
 
-        // Click the "why?" button for Friday — this pre-fills and submits the chat prompt
-        page.locator("#mise-meal-why-friday").click();
+        // when: "why?" pre-fills and submits the chat prompt
+        whyButton(page, "Friday").click();
 
-        // Wait for both user message and assistant reply to land (total = 2)
-        MessageListElement messages = new MessageListElement(page.getByTestId("chat-message-list"));
-        messages.assertMessageCount(2);
-
-        // The first message must be the user turn containing the why-prompt text
-        assertThat(page.getByTestId("chat-message-list")
-                .locator("vaadin-message").first())
-                .containsText("why did you change Friday?");
+        // then: the user turn, then the assistant reply
+        UnifiedMessageList messages = chatDock(page).find(UnifiedMessageList.class);
+        assertThat(messages).hasMessageCount(2);
+        Assertions.assertThat(messages.getMessageTexts().get(0)).contains("why did you change Friday?");
     }
 
     /**
      * UC-004 AC: the "why?" button is visible on a row that has edit history.
      */
     @Test
-    void whyButtonVisibleOnRowWithEditHistory() {
+    @DisplayName("A row with edit history has a why? button")
+    void whyButtonVisibleOnRowWithEditHistory(UnifiedPage page) {
+        // given
+        page.navigate(PlanView.class);
         Meal tuesday = findMealForDay(DayOfWeek.TUESDAY);
-        String altRef = findAlternativeRecipe(tuesday.getRecipeRef());
-        planService.swapMeal(tuesday.getId(), altRef, "swap for IT why-visible test");
+        planService.swapMeal(tuesday.getId(), findAlternativeRecipe(tuesday.getRecipeRef()),
+                "swap for IT why-visible test");
 
-        page.navigate(getUrl() + "/plan");
+        // when
+        page.reload();
 
-        assertThat(page.locator("#mise-meal-why-tuesday")).isVisible();
+        // then
+        assertThat(whyButton(page, "Tuesday")).isVisible();
     }
 
     /**
@@ -506,22 +503,22 @@ class PlanViewIT extends MisePlaywrightIT {
      * Vaadin notification. The service layer throws PinnedMealException; the UI surfaces it.
      */
     @Test
-    void undoOnPinnedMealShowsPinnedNotification() {
+    @DisplayName("Undo on a pinned meal says it is pinned")
+    void undoOnPinnedMealShowsPinnedNotification(UnifiedPage page) {
+        // given: Monday edited (so the undo button appears), then pinned
+        page.navigate(PlanView.class);
         Meal monday = findMealForDay(DayOfWeek.MONDAY);
-        String altRef = findAlternativeRecipe(monday.getRecipeRef());
-
-        // Create an edit so the undo button appears
-        planService.swapMeal(monday.getId(), altRef, "swap for IT pinned-undo test");
-        // Then pin the meal so undoLastEdit() throws PinnedMealException
+        planService.swapMeal(monday.getId(), findAlternativeRecipe(monday.getRecipeRef()),
+                "swap for IT pinned-undo test");
         planService.setPinned(monday.getId(), true, Meal.Editor.USER);
+        page.reload();
 
-        page.navigate(getUrl() + "/plan");
+        // when
+        undoButton(page, "Monday").click();
 
-        // Click the per-day undo button for Monday
-        page.locator("#mise-meal-undo-monday").click();
-
-        // The view must surface the pinned-rejection notification
-        assertThat(page.getByText("Cannot undo — meal is pinned")).isVisible();
+        // then
+        assertThat(page.find(UnifiedNotification.class)
+                .withTextContaining("Cannot undo — meal is pinned")).exists();
     }
 
     /**
@@ -529,19 +526,55 @@ class PlanViewIT extends MisePlaywrightIT {
      * confirming that a successful undo doesn't break the view's KPI rendering.
      */
     @Test
-    void kpiStripStillRenderedAfterUndo() {
+    @DisplayName("The KPI strip is still shown after an undo")
+    void kpiStripStillRenderedAfterUndo(UnifiedPage page) {
+        // given
+        page.navigate(PlanView.class);
         Meal wednesday = findMealForDay(DayOfWeek.WEDNESDAY);
-        String altRef = findAlternativeRecipe(wednesday.getRecipeRef());
-        planService.swapMeal(wednesday.getId(), altRef, "swap for IT kpi-post-undo test");
+        planService.swapMeal(wednesday.getId(), findAlternativeRecipe(wednesday.getRecipeRef()),
+                "swap for IT kpi-post-undo test");
+        page.reload();
 
-        page.navigate(getUrl() + "/plan");
+        // when
+        undoButton(page, "Wednesday").click();
 
-        page.locator("#mise-meal-undo-wednesday").click();
+        // then
+        assertThat(page.find(UnifiedNotification.class).withText("Undo applied")).exists();
+        assertThat(kpiStrip(page)).isVisible();
+    }
 
-        // Confirm undo applied
-        assertThat(page.getByText("Undo applied")).isVisible();
+    // ── Lookups and user tasks ───────────────────────────────────────────────
 
-        // KPI strip must still be visible after the view refreshes
-        assertThat(page.getByTestId("kpi-strip")).isVisible();
+    private static UnifiedContainer kpiStrip(UnifiedPage page) {
+        return page.find(UnifiedContainer.class).withTestId("kpi-strip");
+    }
+
+    private static UnifiedDiv mealRow(UnifiedPage page, LocalDate date) {
+        return page.find(UnifiedDiv.class).withTestId("meal-row").withAttribute("data-meal-date", date.toString());
+    }
+
+    private static UnifiedButton undoButton(UnifiedPage page, String day) {
+        return page.find(UnifiedButton.class).withAccessibleName("Undo " + day);
+    }
+
+    private static UnifiedButton whyButton(UnifiedPage page, String day) {
+        return page.find(UnifiedButton.class).withAccessibleName("Why " + day);
+    }
+
+    private static UnifiedContainer chatDock(UnifiedPage page) {
+        return page.find(UnifiedContainer.class).withTestId("chat-dock");
+    }
+
+    private static UnifiedDiv lastAiMessage(UnifiedPage page) {
+        return chatDock(page).find(UnifiedDiv.class).withTestId("chat-last-ai-message");
+    }
+
+    private static void sendInChatDock(UnifiedPage page, String prompt) {
+        page.step("Ask the chat: " + prompt, () -> {
+            UnifiedMessageInput input = chatDock(page).find(UnifiedMessageInput.class);
+            input.send(prompt);
+            // Focus expands the dock (CSS :focus-within) so the history is on screen
+            input.element().focus();
+        });
     }
 }
