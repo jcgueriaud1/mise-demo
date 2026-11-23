@@ -10,7 +10,7 @@ Issues found along the way: [`findings.md`](findings.md)
 |---|---|---|
 | 0 | Research, inventory, plan | **Done** |
 | 1 | Bump Vaadin 25.2.6 → 25.3.5 | **Done**: unit 193 ✓, IT 74 ✓, AIIT not run (no endpoint) |
-| 2 | Bump DramaFinder 1.2.0 → 2.2.1 (baseline) | |
+| 2 | Bump DramaFinder 1.2.0 → 2.2.1 (baseline) | **Done**: unit 193 ✓, IT 74 ✓, no code changes |
 | 3 | Dry run `FindTestClassesToMigrate` | |
 | 4 | Run the Migration Recipes, unassisted | |
 | 5 | Unblock skipped classes (if any), re-run | |
@@ -121,3 +121,15 @@ alpha4 needs Vaadin 25.3, as alpha3 did. The user approved this with the plan.
 - `./mvnw -Pai-it verify`: **not run** (no LLM endpoint)
 
 **How it went:** about 10 minutes, with the same outcome as alpha3's step 1. This step doesn't depend on the unified-testing version. One process note: I first tried to reuse the alpha3 branch's controller patch with `git diff | git apply`, and the permission classifier blocked it because the user said not to use that branch. I redid the fix from the compiler errors. It's the same 4-line change.
+
+---
+
+## Step 2: DramaFinder 1.2.0 → 2.2.1, the baseline (2026-11-23)
+
+**Changes:** `pom.xml` `dramafinder` 1.2.0 → **2.2.1**, the version `unified-test-bom` 0.1.0-alpha4 pins. alpha3 pinned 2.2.0. No test code changed.
+
+**Results:** `./mvnw -Pit verify` (which also runs surefire): unit **193 ✓**, IT **74 ✓**, 1 min 23 s.
+
+**How it went:** a non-event, as in alpha3. Mise's ITs use `MessageInputElement.get(page)` / `MessageListElement.get(page)` and raw `locator("#id")`, so 2.x's stricter lookups don't affect them. The 2.2.1 "one extra browser call per idle wait" (alpha4 release notes) didn't show in the wall time: 1:21 before, 1:23 after.
+
+**This commit is the baseline** the Migration Recipes run against.
