@@ -19,9 +19,11 @@ Issues found along the way: [`findings.md`](findings.md)
 | 8 | `UnifiedStyleTest` (ArchUnit style rules) | **Done**: green; only the live-LLM ITs excluded |
 | 9 | Try alpha4's new tooling on the migrated suite | **Done**: 1 regression test added; 2 findings |
 | 10 | Docs, skills, memory | **Done**; `spec/architecture.md` pending approval |
-| 11 | Full verification + comparison with alpha3 | |
+| 11 | Full verification + comparison with alpha3 | **Done**: unit 194 ✓, BL 73 ✓ + 2 skipped, PW 75 ✓; AIIT not run |
 
 Convention: **one commit per step**, message `unified-testing-alpha4: step N, <what>`. Each commit appends its entry below and any new issue to `findings.md`.
+
+Durations in this log come from commit timestamps (`git log --date=format:%H:%M:%S`): an agent's wall-clock time, mostly Maven runs, not a person's effort. alpha3's are measured the same way in [`comparison.md`](comparison.md).
 
 ---
 
@@ -33,7 +35,7 @@ Convention: **one commit per step**, message `unified-testing-alpha4: step N, <w
 - The alpha4 jars already in `~/.m2`: `unified-test-rewrite` holds the recipe YAMLs and both bundled skills. `unified-test-rewrite-0.1.0-alpha4.pom` returns HTTP 200 on Central.
 - The alpha3 branch's `migration-log.md` and `findings.md` (F1–F27), as the baseline.
 
-The research took about 5 minutes. Last time most of the effort went into finding the docs. This time the release notes alone answer almost every planning question, and they list which alpha3 findings are fixed.
+Research happened before the step 0 commit and isn't timed. Last time most of the effort went into finding the docs. This time the release notes alone answer almost every planning question, and they list which alpha3 findings are fixed.
 
 ### What alpha4 promises against the alpha3 findings
 
@@ -120,7 +122,7 @@ alpha4 needs Vaadin 25.3, as alpha3 did. The user approved this with the plan.
 - `./mvnw -Pit verify`: **74 ✓** (1 min 21 s)
 - `./mvnw -Pai-it verify`: **not run** (no LLM endpoint)
 
-**How it went:** about 10 minutes, with the same outcome as alpha3's step 1. This step doesn't depend on the unified-testing version. One process note: I first tried to reuse the alpha3 branch's controller patch with `git diff | git apply`, and the permission classifier blocked it because the user said not to use that branch. I redid the fix from the compiler errors. It's the same 4-line change.
+**How it went (3 min by commit time):** the same outcome as alpha3's step 1. This step doesn't depend on the unified-testing version. One process note: I first tried to reuse the alpha3 branch's controller patch with `git diff | git apply`, and the permission classifier blocked it because the user said not to use that branch. I redid the fix from the compiler errors. It's the same 4-line change.
 
 ---
 
@@ -162,7 +164,7 @@ That reason is exact: the `@RegisterExtension TestWatcher` reads `page` to take 
 
 **Deviation from the plan:** the plan had step 4 run the recipe on the untouched suite. The guide's documented workflow is to dry-run, fix and re-run until nothing is skipped, and the dry run had already answered what step 4 was meant to measure. So I followed the guide, and step 5 ("unblock and re-run") is folded in here.
 
-**How it went (about 5 minutes):** this is where alpha4 improves most on alpha3. alpha3's recipe skipped 11 of 12 ITs without a word. Getting to 12/12 took two elimination passes, each comparing converted and skipped classes, plus hand-moving the annotations, `getUrl()`, `port` and `chatModel` out of the base class (alpha3 log, step 5). alpha4 named the one real blocker on the first pass, in a CSV, and handled everything else itself (still to confirm in step 4).
+**How it went (1.5 min by commit time):** this is where alpha4 improves most on alpha3. alpha3's recipe skipped 11 of 12 ITs without a word. Getting to 12/12 took two elimination passes, each comparing converted and skipped classes, plus hand-moving the annotations, `getUrl()`, `port` and `chatModel` out of the base class (alpha3 log, step 5). alpha4 named the one real blocker on the first pass, in a CSV, and handled everything else itself (still to confirm in step 4).
 
 ---
 
@@ -213,7 +215,7 @@ The raw locator conversion did fire: **22 `withId(..)` and 17 `withTestId(..)`**
 - New in alpha4: `summary.md` lists **62 of 74 "Scenarios without a check"**. That is accurate: their checks are still raw Playwright `assertThat` behind the Escape Hatch, which the recorder can't see. It works as a to-do list for step 7. `summary.json` records the commit and the uncommitted-changes hash.
 - The surefire and failsafe runs write to the same `target/surefire-reports/unified-evidence/`. The summary says "74 passed, 1 skipped", mixing the two phases (G6).
 
-**How it went (about 15 minutes, mostly reading the diff):** the biggest single improvement over alpha3. alpha3 went 2/13 → (hand prep, 2 iterations) → 12/12 + 285 markers. alpha4 went 13/13 in one run, with the right annotations and fixtures, green on Playwright before any marker was touched. Fewer markers remain, and they are more focused: almost all are real Escape Hatch checks (CSS, scroll, DOM structure) or assertion kinds the recipe doesn't map yet.
+**How it went (3 min by commit time, mostly reading the diff):** the biggest single improvement over alpha3. alpha3 went 2/13 → (hand prep, 2 iterations) → 12/12 + 285 markers. alpha4 went 13/13 in one run, with the right annotations and fixtures, green on Playwright before any marker was touched. Fewer markers remain, and they are more focused: almost all are real Escape Hatch checks (CSS, scroll, DOM structure) or assertion kinds the recipe doesn't map yet.
 
 ---
 
@@ -259,7 +261,7 @@ The new Findable View (`….view.txt`) was written too: `Findable view of “/we
 
 The Playwright `summary.md` now reads: *"Compared with Browserless: 10 scenarios ran on both Testing Tools: same result and same User Steps on each. 64 ran on Playwright only. Both runs are of commit `a61afe0`, with the same uncommitted changes."*
 
-**How it went (about 20 minutes):** the build config was a copy-paste from the guide; alpha3 had to discover it. The time went into the app bug, and that took one read of `user-steps.txt`. alpha3 found its Browserless-only app bug (F20) later and by debugging.
+**How it went (4 min by commit time):** the build config was a copy-paste from the guide; alpha3 had to discover it. The time went into the app bug, and that took one read of `user-steps.txt`. alpha3 hit the same bug (its step 7a, same fix, F20). Its log names the exception from the test failure; alpha4 puts it under the User Step that caused it, in the evidence file.
 
 ---
 
@@ -278,7 +280,7 @@ The tools used for each marker: the bundled `META-INF/unified/api-reference.md` 
 | `getByText("Stored messages:")` | **Resolved**: `page.find(UnifiedSpan.class).withTextContaining(..)` |
 | `hasURL(".*/plan.*")` | **Resolved**: `assertThat(page).isAt(PlanView.class)` |
 
-All four tests dropped `@RequiresTestingTool(PLAYWRIGHT)`. **Browserless 4 ✓, Playwright 4 ✓.** I also renamed `OnboardingRedirectIT`'s `setupTest()` to `seedHousehold()`, since its "overrides the base class" comment no longer applied. In alpha3 these two classes needed the Escape Hatch kept for the title check (F21).
+All four tests dropped `@RequiresTestingTool(PLAYWRIGHT)`. **Browserless 4 ✓, Playwright 4 ✓.** I also renamed `OnboardingRedirectIT`'s `setupTest()` to `seedHousehold()`, since its "overrides the base class" comment no longer applied. In alpha3, `HomeViewIT` kept its title check behind the Escape Hatch (F21).
 
 ### 7b: OnboardingViewIT (10 markers → 0)
 
@@ -457,7 +459,7 @@ The failsafe count is 74. The 2 not in the Unified summary are the repository-le
 
 "Compared with Browserless" on the full run: *70 scenarios ran on both Testing Tools: 0 end differently, 1 takes different User Steps.* The one is `ShoppingViewIT`'s "Already have" test. It clicks the first row's button, which was garlic on Playwright and carrot on Browserless. The cause isn't the tools: `PlanService.generateActivePlan` shuffles recipes, so each run gets a different list. The comparison exposed nondeterministic test data that a pass/fail report never would. I left it, since the test is meant to work for any row.
 
-**How it went (about 2 h 15 min, the bulk of the migration).** Every class went green on both tools on the first or second run. The second run was only needed for the date picker (7h), and the cross-tool comparison explained that failure. The time went into reading views to choose good lookups (accessible names over ids), not into fighting the API. Four alpha4 additions removed whole categories of alpha3 work:
+**How it went (19 min by commit time, the bulk of the migration).** Every class went green on both tools on the first or second run. The second run was only needed for the date picker (7h), and the cross-tool comparison explained that failure. The time went into reading views to choose good lookups (accessible names over ids), not into fighting the API. Four alpha4 additions removed whole categories of alpha3 work:
 - the shipped chat Wrappers (F7): alpha3 wrote two Wrappers plus two Browserless implementations
 - `hasTitle` (F21)
 - `hasColumn` (F22)
@@ -477,7 +479,7 @@ The failsafe count is 74. The 2 not in the Unified summary are the repository-le
 
 **Result:** `./mvnw test -Dtest=UnifiedStyleTest`: **1 ✓**.
 
-**How it went (about 5 minutes):** in alpha3 this step was a separate pass that added `@DisplayName` and given/when/then to every migrated test. Writing to the skill's "Shape of a test" while resolving markers made step 8 a check rather than a rewrite. The rule messages are specific (`file:line`, what to add) and need no lookup.
+**How it went (under 1 min by commit time):** a check, not a rewrite. As in alpha3, `@DisplayName` and given/when/then were written while resolving markers. The rule messages are specific (`file:line`, what to add) and need no lookup.
 
 ---
 
@@ -521,7 +523,7 @@ The view also lists only components with a Wrapper type, so the week badge (`Spa
 
 In 10 s it changed exactly one line, the string in the `prevWeek(page)` helper, and the data table recorded `withAccessibleName, Previous week → Previous Week`. The class then passed 13/13 on both tools. Then I reverted both changes. A bigger rename ("Go to previous week") gives no suggestion; the new label is listed first under `Nearby`, and the recipe leaves it alone. That's the documented behaviour, but the threshold isn't stated (G14). The `Did you mean` line appears in `summary.md` and `user-steps.json` but not in `user-steps.txt`.
 
-**How it went (about 25 minutes):** each feature worked as described on a real suite. `hasNoErrors()` and `ApplyDidYouMean` are the ones I'd keep using here.
+**How it went (10 min by commit time):** each feature worked as described on a real suite. `hasNoErrors()` and `ApplyDidYouMean` are the ones I'd keep using here.
 
 ---
 
@@ -540,4 +542,71 @@ In 10 s it changed exactly one line, the string in the `prevWeek(page)` helper, 
 
 **Not changed, needs approval:** `spec/architecture.md` (CLAUDE.md guardrail). It still says "Vaadin Flow 25.2", `vaadin-ai-components-flow`, "Vaadin Browserless Test framework (`browserless-test-junit6`) for view tests" and "DramaFinder + Microsoft Playwright … for end-to-end browser tests". The proposed change is in the wrap-up.
 
-**How it went (about 20 minutes):** the recipe's `CLAUDE.md` pointer (F15 fixed) was a good start, but a project's own docs describe its test stack in many places: here 8 files and 2 memories. No recipe could know about them. A grep for `DramaFinder|Playwright|Browserless|MisePlaywrightIT` found them all.
+**How it went (2 min by commit time):** the recipe's `CLAUDE.md` pointer (F15 fixed) was a good start, but a project's own docs describe its test stack in many places: here 8 files and 2 memories. No recipe could know about them. A grep for `DramaFinder|Playwright|Browserless|MisePlaywrightIT` found them all.
+
+---
+
+## Step 11: Full verification and comparison (2026-11-23)
+
+**`./mvnw clean -Pit verify`**, run twice: once from `clean`, then a second time to check for flakiness. Both runs were green.
+
+| Phase | Result |
+|---|---|
+| surefire (unit + `PlanViewBrowserlessTest` + `UnifiedStyleTest`) | **194 run, 0 failed** |
+| failsafe `it-browserless` | **75 run, 0 failed, 2 skipped**. `summary.md`: 71 Unified UI Tests passed, 2 skipped (ChatDock's `@RequiresBrowser` and Playwright-only tests); the other 2 are repository-only tests without a page |
+| failsafe `it-playwright` | **75 run, 0 failed**. `summary.md`: 73 passed. *Compared with Browserless: 71 scenarios ran on both Testing Tools: 0 end differently, 1 takes different User Steps* (the random-plan "Already have" test, see 7i) |
+| `BUILD SUCCESS` | **60.5 s** from clean, **59.4 s** warm. Unified durations: Browserless 6.7 s for 73 scenarios, Playwright 28.9 s |
+
+For comparison, the DramaFinder baseline (step 2) took 83 s for Playwright alone, with 67 s of IT class time. Now both tools take 42 s of class time.
+
+**Not run:**
+- `./mvnw -Pai-it verify`: no LLM endpoint on this machine. The AIITs drive the tool beans through Spring AI's `ChatClient` and touch neither the UI tests nor the Vaadin AI components that changed, but run them before merging.
+- `-Pmanual-verify`: the `ManualExamples*` ITs still carry 9 markers; see "Open items".
+
+**Comparison with alpha3:** [`comparison.md`](comparison.md).
+
+**Corrections made to this log during step 11:**
+- The "How it went" durations were first written as estimates, and the commit timestamps show they were far too high (step 7 was "about 2 h 15 min"; it took 19 min). Every duration now comes from the commit timestamps, as in `comparison.md`.
+- Three statements about alpha3 didn't match its log (which class kept a title Escape Hatch; when alpha3 added `@DisplayName`; how alpha3 diagnosed the OnboardingView bug). They're corrected.
+
+### Before → after
+
+| | Before (`dev-main`) | After (this branch) |
+|---|---|---|
+| Vaadin / Spring AI / DramaFinder | 25.2.6 / 2.0.1 / 1.2.0 | 25.3.5 / 2.0.1 / 2.2.1 (transitive, via `unified-test-playwright`) |
+| UI test API | DramaFinder + raw Playwright; `SpringBrowserlessTest` | Unified API, `unified-test-*` 0.1.0-alpha4 |
+| UI tests runnable on Browserless | 1 | **71** (+2 that need a browser) |
+| UI tests runnable on Playwright | 74 | 75 (+1 regression test) |
+| Raw `locator(..)` / `evaluate` / `waitForFunction` in the ITs | 71 / 14 / 20 | 1 test (scroll JS) + the 2 unconverted live-LLM ITs |
+| Reports | JUnit XML + a screenshot on failure | per tool: User Steps with server/console lines, `summary.md` / `summary.json` / `report.html`, cross-tool comparison, Findable View on failure |
+
+### Open items
+
+1. **The live-LLM ITs.** `ManualExamplesReportsIT` and `ManualExamplesStopIT` still have 9 Migration Markers. Resolve them with a live endpoint and `-Pmanual-verify`, then drop their filter from `UnifiedStyleTest`.
+2. **`spec/architecture.md`.** Needs approval (the proposed change is in the wrap-up).
+3. **AIIT.** Run `./mvnw -Pai-it verify` against the live model.
+4. **Upstream.** File G1–G14, or the non-positive ones, against parttio/unified-testing-tool, as was done for alpha3 (#368). Not done: that's an outward-facing action left to the user.
+
+### Commits
+
+```
+11fedde unified-testing-alpha4: step 0, migration plan and process log
+d4956a1 unified-testing-alpha4: step 1, bump Vaadin 25.2.6 -> 25.3.5
+79bb21d unified-testing-alpha4: step 2, bump DramaFinder 1.2.0 -> 2.2.1 (baseline)
+9d07e80 unified-testing-alpha4: step 3, FindTestClassesToMigrate dry run; drop screenshot watcher
+a61afe0 unified-testing-alpha4: step 4, run the unified-test migration recipes
+663feb9 unified-testing-alpha4: step 6, run the ITs on Browserless and Playwright
+8a1974e unified-testing-alpha4: step 7a, resolve markers in HomeViewIT and OnboardingRedirectIT
+c9132b8 unified-testing-alpha4: step 7b, resolve markers in OnboardingViewIT
+b68b153 unified-testing-alpha4: step 7c, resolve markers in GenerateFutureWeeksIT
+af4ff6a unified-testing-alpha4: step 7d, resolve markers in ReportsViewIT
+d42a0ee unified-testing-alpha4: step 7e, resolve markers in ChatDockIT and ChatBusyStopIT
+6e84a8a unified-testing-alpha4: step 7f, resolve markers in PlanViewIT
+9b01774 unified-testing-alpha4: step 7g, resolve markers in ShoppingViewIT
+f947d82 unified-testing-alpha4: step 7h, resolve markers in WeekNavigationIT
+2026187 unified-testing-alpha4: step 7i, PlanViewBrowserlessTest; step 7 summary
+22d9763 unified-testing-alpha4: step 8, add the Unified style rules test
+4fed466 unified-testing-alpha4: step 9, try alpha4's new tooling; hasNoErrors regression test
+5ecc967 unified-testing-alpha4: step 10, update docs, skills and memory for Unified UI Tests
+(+ this step 11 commit)
+```

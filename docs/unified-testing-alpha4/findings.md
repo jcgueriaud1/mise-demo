@@ -54,7 +54,7 @@ The release notes say a failed test writes `<test>.view.txt` and that the failur
 
 ### G9: Server-log lines under the User Step found an app bug in one read. Verified · positive
 
-On the first Browserless run, `OnboardingViewIT` failed with `Expected exactly one message input, found none`. The cause was printed under User Step 1 in `user-steps.txt`: `⚠ server ERROR … CancellableLLMProvider is already in use by another AIOrchestrator`. It came from a view that rebuilds its orchestrator when `beforeEnter` fires again on the same instance, which Browserless does on a same-route `navigate` and a browser hides behind a full page load. Without the log line, "found none" would have meant a debugging session. This is the same class of finding as alpha3's F20, which took longer to diagnose.
+On the first Browserless run, `OnboardingViewIT` failed with `Expected exactly one message input, found none`. The cause was printed under User Step 1 in `user-steps.txt`: `⚠ server ERROR … CancellableLLMProvider is already in use by another AIOrchestrator`. It came from a view that rebuilds its orchestrator when `beforeEnter` fires again on the same instance, which Browserless does on a same-route `navigate` and a browser hides behind a full page load. Without the log line, "found none" would have meant a debugging session. It's the same bug alpha3 found (F20, fixed the same way). What's new is that the cause is printed under the step that triggered it, in the evidence a reviewer or agent reads first.
 
 ### G10: `UnifiedMessageList` has no positional or per-sender check. Verified · minor
 
@@ -74,7 +74,7 @@ The first version of the picker test passed on Browserless and failed on Playwri
 
 `page.describe()` on `/plan` (12 components on Browserless, 13 on Playwright):
 - **Not the same on every tool**, as the release notes promise. Playwright also lists `text area “Message”  page.find(UnifiedTextArea.class).withAccessibleName("Message")`, the text area inside `vaadin-message-input`. It isn't a component the app created, and Browserless doesn't list it.
-- **"not unique: 7 alike; this one in container (test id “meal-row”)"** is printed for each of the 7 pin buttons. All 7 rows share that test id, so the hint names nothing that tells them apart. Each button has a distinct `data-pin-date` and `aria-label`-free row context. The test in 7f uses `withAttribute("data-pin-date", ..)`, and the view could suggest that.
+- **"not unique: 7 alike; this one in container (test id “meal-row”)"** is printed for each of the 7 pin buttons. All 7 rows share that test id, so the hint names nothing that tells them apart. Each button has its own `data-pin-date` attribute, which the test in 7f uses (`withAttribute("data-pin-date", ..)`), and the view could suggest it.
 - **Only Wrapper-typed components are listed.** The week badge (`Span`, clicked to open the picker) and the tabs (`Div` with a click listener, clicked with `UnifiedDiv.click()`) are findable and clickable, but not in the view.
 
 **Suggestion:** filter out a component's own internal children on browser tools. When siblings share a container, look for a distinguishing attribute. List plain HTML components that have a click listener.
@@ -88,8 +88,12 @@ A label changed from "Previous week" to "Previous Week" gets `Did you mean find(
 
 | alpha3 | Status in alpha4 | Evidence |
 |---|---|---|
-| F1 | **Repeats** at the alpha4 tag | G2 |
-| F6, F16, F17 | **Fixed**: the dry run lists every skipped class and why, in one pass | step 3 |
+| F1 | **Repeats**: the alpha4-tagged guides give alpha3 coordinates | G2 |
+| F2 | **Fixed**: no "not published yet" warning in the alpha4-tagged guides | step 3 |
+| F3 | Open: the site still documents `main`; G2 is a consequence | G2 |
+| F4 | **Fixed** (per the notes and the guide's "Vaadin 25.3 first" warning); not exercised, since Vaadin was bumped first | step 1 |
+| F5 | **Mostly fixed**: the BOM now pins only DramaFinder (2.2.1), no Vaadin-managed artifact | BOM pom |
+| F6, F16, F17 | **Fixed**: the dry run lists every skipped class and why, in one pass; `getUrl()` and base-class members are converted | steps 3, 4 |
 | F7 | **Fixed** (the Wrappers exist); recipe coverage partial | G5 |
 | F8 | **Mostly fixed**: 39 locators converted; assertion coverage partial | G4 |
 | F9 | Open | G1 |
@@ -99,11 +103,42 @@ A label changed from "Previous week" to "Previous Week" gets `Did you mean find(
 | F13 | **Fixed**: no `spring-security-core` needed | step 4 |
 | F14 | **Fixed**: `browserless-test-spring` version removed | step 4 |
 | F15 | **Fixed**: pointer in `CLAUDE.md` | step 4 |
-| F18 | **Fixed** (documented, copy-paste snippet with compare-dir) | step 6 |
+| F18 | **Fixed** (documented, copy-paste snippet with `compare-dir`) | step 6 |
 | F19 | **Fixed**: comments stay above the statement | step 4 |
+| F20 | Still true (a plus), and alpha4's server-log lines make it fast to diagnose | G9 |
 | F21 | **Fixed**: `assertThat(page).hasTitle(..)` on every tool | 7a, 7d, 7f, 7g |
 | F22 | **Fixed**: `hasColumn` / `doesNotHaveColumn` | 7d |
 | F23 | **Fixed**: `UnifiedDiv.click()` | 7h |
-| F24 | Still true (by design); now flagged by the cross-tool comparison | G11, G12 |
-| F20 | Still true (positive), and alpha4's server-log lines make it fast to diagnose | G9 |
-| F25 | **Fixed** for `getView()`; `getUrl()` paths stay strings | G7 |
+| F24 | Still true (by design); now flagged at once by the cross-tool comparison | G11, G12 |
+| F25 | **Fixed** for `getView()` and `navigate(View, QueryParameters)`; the recipe's `getUrl()` paths stay strings | G7 |
+| F26 | **Fixed** per the release notes; not exercised (no `tryUnwrap` helper in this migration) | |
+| F27 | **Fixed**: `UnifiedMessageInput` `element().focus()` expands the dock on Playwright | 7e, 7f |
+
+**Tally** of alpha3's 27 findings:
+
+| Status | Count | Findings |
+|---|---|---|
+| Fixed or mostly fixed, verified here | **20** | |
+| Reported fixed, not exercised | 2 | F4, F26 |
+| Still open | 2 | F3, F9 |
+| Still true by nature (properties of Browserless) | 2 | F20, F24 |
+| Repeats | 1 | F1 |
+
+## Summary of the new findings
+
+| # | Area | Kind |
+|---|---|---|
+| G1 | Agent skill user-only | repeat of F9 |
+| G2 | Release-tag docs one version behind | repeat of F1 |
+| G3 | Dry run names the blocker, not the fix | positive + suggestion |
+| G4 | Locator conversion skips `containsText` / `hasAttribute` / `hasClass` | recipe gap |
+| G5 | Scoped / focused chat elements not converted | recipe gap |
+| G6 | Surefire and failsafe share one evidence dir by default | build default |
+| G7 | `getUrl()` paths not turned into route classes | recipe gap, minor |
+| G8 | Findable View written outside the test's evidence dir | reports, minor |
+| G9 | Server-log lines found an app bug | positive |
+| G10 | No positional / per-sender message check | API gap, minor |
+| G11 | No way to pick a date in an overlay-only `DatePicker` | API gap |
+| G12 | "Compared with Browserless" catches Browserless-only passes | positive |
+| G13 | Findable View differs between tools; unhelpful "not unique" hint | reports |
+| G14 | `Did you mean` threshold undocumented, missing from `user-steps.txt` | reports, minor |
