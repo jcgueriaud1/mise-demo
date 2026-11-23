@@ -373,3 +373,23 @@ Also:
 - `mealEditRowPersistedAfterAiSwap` is service-level, so it dropped its unused `page`.
 
 All 19 tests run everywhere. **Browserless 18 ✓ + 1 plain JUnit, Playwright 18 ✓ + 1**, green on the first run. alpha3's 7f needed its custom chat Wrappers and kept the title check in Playwright.
+
+### 7g: ShoppingViewIT (42 markers → 0)
+
+| Marker(s) | Outcome |
+|---|---|
+| `hasTitle("Mise — Shopping")` | **Resolved**: `assertThat(page).hasTitle(..)` |
+| `locator("#mise-shopping-store-recommended")).isAttached()` | **Resolved**: `UnifiedSpan.withTestId("recommended-store")` + `exists()` |
+| `getByTestId("recommendation-panel").locator(".mise-shopping-rec-store-name")` + `isVisible`, `not().hasText("—")`, `not().isEmpty()` | **Resolved**: `panel.findComponent(H2.class).withClassName(..)` + `isVisible()`, then AssertJ `isNotBlank().isNotEqualTo("—")` on `getText()` (no negative text check in the API) |
+| `getByTestId("shopping-total-cost")` + `containsText("€")` | **Resolved**: `UnifiedSpan` + `isVisible().hasTextContaining("€")` |
+| panel-scoped `store-mode-toggle` / `store-mode-one` / `store-mode-mix` (5) | **Resolved**: `panel.find(UnifiedDiv/UnifiedButton.class).withTestId(..)`. The buttons' text includes a variable summary ("One store · €84.40, 2 stops"), so the test id stays |
+| `hasClass("active")` / `not().hasClass("active")` (3) | **Resolved**: `assertThat(button.withClassName("active")).exists()` / `doesNotExist()` |
+| `getByTestId("pantry-section")).isAttached()` | **Resolved**: `UnifiedDetails.withTestId(..)` + `exists()` |
+| `locator("[id^='mise-shopping-aisle-']")` + `first().isVisible()` + `count() ≥ 1` | **Resolved**: `UnifiedDiv.withClassName("mise-shopping-aisle-group")` + `exists()` (at least one) |
+| `getByTestId("shopping-row")` + `filter(hasText ..)` + `count()` (about 12) | **Resolved**: `UnifiedDiv.withTestId("shopping-row").withTextContaining(..)` with `exists()` / `doesNotExist()` / `hasCount(n)`; "at most one" uses `all().size()` |
+| the `waitForTimeout(150)` count-stabilising loop + `first().locator(".mise-shopping-item-name").innerText()` + `getByTestId("row-already-have").click()` | **Resolved**: Auto-Wait settles the list after `navigate`, so the loop is gone. The first row's name is read through `all().get(0).find(UnifiedSpan.class).withClassName(..)`, and its button is found by `withAccessibleName("Mark <name> as already have")` |
+| `page.navigate("shopping")` / `playwright.reload()` as a reload | **Resolved**: `page.reload()` |
+
+The "absent" checks (`olive oil` suppressed) now assert first that rows exist, so they can't pass on a list that hasn't rendered yet.
+
+All 12 tests run everywhere. **Browserless 12 ✓, Playwright 12 ✓.** The old test needed a hand-written `waitForTimeout` polling loop because it flaked; Auto-Wait removed the need.
