@@ -9,7 +9,7 @@ Issues found along the way: [`findings.md`](findings.md)
 | Step | What | Status |
 |---|---|---|
 | 0 | Research, inventory, plan | **Done** |
-| 1 | Bump Vaadin 25.2.6 → 25.3.5 | |
+| 1 | Bump Vaadin 25.2.6 → 25.3.5 | **Done**: unit 193 ✓, IT 74 ✓, AIIT not run (no endpoint) |
 | 2 | Bump DramaFinder 1.2.0 → 2.2.1 (baseline) | |
 | 3 | Dry run `FindTestClassesToMigrate` | |
 | 4 | Run the Migration Recipes, unassisted | |
@@ -100,3 +100,24 @@ The plan is the step table above. The user approved it, including the `pom.xml` 
 
 - **Step 3** is new (the dry run).
 - **Step 4** runs on the untouched suite. alpha3 had to remove base-class members by hand first (its step 5), and those passes are the main effort alpha4 says it removes.
+
+---
+
+## Step 1: Vaadin 25.2.6 → 25.3.5 (2026-11-23)
+
+alpha4 needs Vaadin 25.3, as alpha3 did. The user approved this with the plan.
+
+**Changes**
+- `pom.xml`: `vaadin.version` 25.2.6 → **25.3.5**.
+  - `spring-ai.version` stays **2.0.1**, because `vaadin-ai-core-flow:25.3.5` declares `spring-ai-client-chat:2.0.1`.
+  - The AI components now come from `vaadin-ai-core-flow` + `vaadin-ai-extensions-flow`, which `vaadin` pulls in.
+  - `browserless-test-junit6` follows to 25.3.2. `browserless-test-spring` is still at the hard-coded 1.1.2.
+- **One compile break, in the app, not the tests.** `AIController.onRequest()` / `onResponse(Throwable)` now take `RequestListener.RequestEvent` / `ResponseListener.ResponseEvent`. I fixed `ui/reports/ReportsAIController`, which forwards the event to its three delegates.
+- Docs: the pom comment, the CLAUDE.md "Sharp edges" note and `.claude/memory/project_vaadin_ai_versions.md`.
+
+**Results**
+- `./mvnw test`: **193 ✓** (14 s)
+- `./mvnw -Pit verify`: **74 ✓** (1 min 21 s)
+- `./mvnw -Pai-it verify`: **not run** (no LLM endpoint)
+
+**How it went:** about 10 minutes, with the same outcome as alpha3's step 1. This step doesn't depend on the unified-testing version. One process note: I first tried to reuse the alpha3 branch's controller patch with `git diff | git apply`, and the permission classifier blocked it because the user said not to use that branch. I redid the fix from the compiler errors. It's the same 4-line change.
